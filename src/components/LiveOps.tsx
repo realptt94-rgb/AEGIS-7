@@ -1,283 +1,309 @@
-import { useEffect, useMemo, useReducer } from "react";
+import { useEffect, useState } from "react";
 import { LIVE_SOURCES, type LiveSourceId } from "../data";
-import { hashStr, setPaused, timeAgo, useFeed, type LiveEvent } from "../live";
+import { refreshFeed, setPaused, timeAgo, useFeed, type LiveEvent } from "../live";
 import { useInView } from "../hooks";
-import { IconPause, IconPlay, IconRadar } from "./Icons";
+import { IconCrosshair, IconExternal, IconPause, IconPlay, IconRadar, IconWarning } from "./Icons";
 
-const SEV_HEX = ["#43f08d", "#ffb020", "#ff4d5e"];
+const SEV_COLOR = ["text-pulse", "text-warn", "text-alert"];
 const SEV_LABEL = ["FAIBLE", "MOYEN", "CRITIQUE"];
-const SRC_HEX: Record<LiveSourceId, string> = {
-  THREATFOX: "#38e1ff",
-  FEODO: "#ff4d5e",
-  URLHAUS: "#ffb020",
-  MALWAREBAZAAR: "#b18cff",
+
+const SOURCE_CHIP: Record<LiveSourceId, string> = {
+  THREATFOX: "text-cyber border-cyber/50 bg-cyber/10",
+  FEODO: "text-alert border-alert/50 bg-alert/10",
+  URLHAUS: "text-warn border-warn/50 bg-warn/10",
+  MALWAREBAZAAR: "text-[#b18cff] border-[#b18cff]/50 bg-[#b18cff]/10",
+  CVE: "text-snow border-line bg-snow/5",
 };
 
-function SourceCard({ id }: { id: LiveSourceId }) {
-  const feed = useFeed();
-  const s = feed.sources[id];
-  const meta = LIVE_SOURCES[id];
+const SOURCE_IDS = Object.keys(LIVE_SOURCES) as LiveSourceId[];
+
+/* ------------------------------------------------------------------ */
+/* Radar alimenté par les indicateurs réels                            */
+/* ------------------------------------------------------------------ */
+
+function RadarPanel({ events }: { events: LiveEvent[] }) {
+  const blips = events.slice(0, 12).map((e, i) => ({
+    id: e.id,
+    x: 20 + (Math.abs(e.ioc.charCodeAt(0) * 7 + e.ioc.length * 13 + i * 37) % 160),
+    y: 20 + (Math.abs(e.ioc.charCodeAt(e.ioc.length - 1) * 11 + i * 53) % 160),
+    sev: e.severity,
+    ioc: e.ioc,
+    source: e.source,
+  }));
   return (
-    <div className="panel relative overflow-hidden p-4">
-      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: SRC_HEX[id], opacity: 0.7 }} />
-      <div className="flex items-center justify-between pl-2">
-        <h3 className="font-display text-xs font-bold tracking-[0.18em] text-snow">{meta.name.toUpperCase()}</h3>
-        <span
-          className={`h-2 w-2 rounded-full ${
-            s.status === "ok" ? "animate-pulse-dot bg-pulse" : s.status === "loading" ? "animate-pulse bg-warn" : "bg-alert"
-          }`}
-        />
-      </div>
-      <p className="mt-1 pl-2 font-mono text-[9px] tracking-[0.14em] text-fog-dim">{meta.org}</p>
-      <div className="mt-3 flex items-end justify-between pl-2">
-        <span className="font-display text-2xl font-bold tabular-nums text-snow">{s.count}</span>
-        <span className="font-mono text-[9px] tracking-[0.12em] text-fog-dim">
-          {s.status === "error" ? (
-            <span className="text-alert">INJOIGNABLE</span>
-          ) : s.status === "loading" ? (
-            <span className="text-warn">LECTURE…</span>
-          ) : (
-            <>
-              {s.latency} ms · {s.updated ? timeAgo(s.updated) : "—"}
-            </>
-          )}
+    <div className="panel panel-corner relative overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+        <h2 className="flex items-center gap-2.5 font-display text-xs font-bold tracking-[0.24em] text-snow">
+          <IconRadar className="h-4 w-4 text-cyber" /> BALAYAGE — INDICATEURS RÉELS
+        </h2>
+        <span className="font-mono text-[10px] tracking-[0.16em] text-fog-dim">
+          {blips.length} CONTACT{blips.length > 1 ? "S" : ""}
         </span>
+      </div>
+      <div className="bg-grid-layer relative aspect-square max-h-[340px] w-full">
+        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full">
+          {[88, 62, 36].map((r) => (
+            <circle key={r} cx="100" cy="100" r={r} fill="none" className="stroke-line" strokeWidth="1" />
+          ))}
+          <line x1="100" y1="12" x2="100" y2="188" className="stroke-line" strokeWidth="0.6" />
+          <line x1="12" y1="100" x2="188" y2="100" className="stroke-line" strokeWidth="0.6" />
+          <g className="animate-sweep" style={{ transformOrigin: "100px 100px" }}>
+            <line x1="100" y1="100" x2="100" y2="14" stroke="#38e1ff" strokeWidth="1.4" opacity="0.9" />
+            <path d="M100 100 L100 14 A86 86 0 0 1 143 26 Z" fill="#38e1ff" opacity="0.07" />
+          </g>
+          <circle cx="100" cy="100" r="2.5" fill="#38e1ff" />
+          {blips.map((b) => (
+            <g key={b.id}>
+              <circle cx={b.x} cy={b.y} r="3" fill="none" className={SEV_COLOR[b.sev]} strokeWidth="1" opacity="0.85">
+                <animate attributeName="r" values="3;9" dur="1.8s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.85;0" dur="1.8s" repeatCount="indefinite" />
+              </circle>
+              <circle cx={b.x} cy={b.y} r="2.2" className={b.sev === 2 ? "fill-alert" : b.sev === 1 ? "fill-warn" : "fill-pulse"} />
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="flex items-center justify-between border-t border-line px-5 py-3">
+        <div className="flex gap-4 font-mono text-[9px] tracking-[0.16em] text-fog-dim">
+          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-pulse" />FAIBLE</span>
+          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-warn" />MOYEN</span>
+          <span className="flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-alert" />CRITIQUE</span>
+        </div>
+        <span className="font-mono text-[9px] tracking-[0.16em] text-cyber">FLUX abuse.ch + CIRCL/NVD</span>
       </div>
     </div>
   );
 }
 
-function EventRow({ e, index }: { e: LiveEvent; index: number }) {
-  const frma = e.country === "FR" || e.country === "MA";
-  return (
-    <li
-      className="animate-row-in group relative flex items-center gap-3 border-b border-line/50 py-2.5 pl-4 pr-3 transition-colors hover:bg-snow/[0.03]"
-      style={{ animationDelay: `${Math.min(index, 20) * 30}ms` }}
-    >
-      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: SEV_HEX[e.severity], opacity: 0.8 }} />
-      <span className="w-14 shrink-0 font-mono text-[9px] tabular-nums text-fog-dim">
-        {new Date(e.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-      </span>
-      <span
-        className="w-[74px] shrink-0 border px-1.5 py-0.5 text-center font-mono text-[8px] tracking-[0.12em]"
-        style={{ borderColor: SRC_HEX[e.source] + "55", color: SRC_HEX[e.source] }}
-      >
-        {e.source}
-      </span>
-      <span className="font-display w-32 shrink-0 truncate text-[11px] font-bold tracking-wide text-snow" title={e.malware}>
-        {e.malware}
-      </span>
-      <span className="min-w-0 flex-1 truncate font-mono text-[10px] text-fog" title={e.ioc}>
-        {e.ioc}
-      </span>
-      {e.tags.slice(0, 2).map((t) => (
-        <span key={t} className="hidden shrink-0 border border-line px-1.5 py-0.5 font-mono text-[8px] text-fog-dim xl:block">
-          {t}
-        </span>
-      ))}
-      {frma ? (
-        <span className="shrink-0 border border-cyber/60 bg-cyber/10 px-1.5 py-0.5 font-mono text-[8px] font-bold tracking-[0.14em] text-cyber">
-          {e.country}
-        </span>
-      ) : e.country ? (
-        <span className="hidden shrink-0 font-mono text-[9px] text-fog-dim sm:block">{e.country}</span>
-      ) : null}
-      <span className={`hidden shrink-0 font-mono text-[8px] tracking-[0.12em] sm:block`} style={{ color: SEV_HEX[e.severity] }}>
-        {SEV_LABEL[e.severity]}
-      </span>
-    </li>
-  );
-}
-
-function LiveRadar({ events }: { events: LiveEvent[] }) {
-  const blips = useMemo(
-    () =>
-      events.slice(0, 26).map((e) => {
-        const h = hashStr(e.ioc);
-        const ang = ((h % 360) * Math.PI) / 180;
-        const rad = 20 + ((h >> 4) % 70);
-        return {
-          x: 100 + Math.cos(ang) * rad,
-          y: 100 + Math.sin(ang) * rad,
-          sev: e.severity,
-          label: `${e.malware} — ${e.ioc.slice(0, 42)}`,
-          id: e.id,
-        };
-      }),
-    [events]
-  );
-  return (
-    <svg viewBox="0 0 200 200" className="mx-auto h-full max-h-[260px] w-auto">
-      <circle cx="100" cy="100" r="92" fill="none" stroke="#22304d" strokeWidth="1" />
-      <circle cx="100" cy="100" r="62" fill="none" stroke="#22304d" strokeWidth="0.8" strokeDasharray="3 4" />
-      <circle cx="100" cy="100" r="32" fill="none" stroke="#22304d" strokeWidth="0.8" strokeDasharray="3 4" />
-      <line x1="8" y1="100" x2="192" y2="100" stroke="#22304d" strokeWidth="0.6" />
-      <line x1="100" y1="8" x2="100" y2="192" stroke="#22304d" strokeWidth="0.6" />
-      <g style={{ transformOrigin: "100px 100px", animation: "sweep 4.5s linear infinite" }}>
-        <path d="M100 100 L100 8 A92 92 0 0 1 146 16.5 Z" fill="rgba(56,225,255,0.10)" />
-        <line x1="100" y1="100" x2="100" y2="8" stroke="#38e1ff" strokeWidth="1.4" />
-      </g>
-      {blips.map((b) => (
-        <g key={b.id}>
-          <circle cx={b.x} cy={b.y} r="6" fill="none" stroke={SEV_HEX[b.sev]} strokeWidth="0.7" className="animate-ping" style={{ transformOrigin: `${b.x}px ${b.y}px` }} />
-          <circle cx={b.x} cy={b.y} r="2.4" fill={SEV_HEX[b.sev]}>
-            <title>{b.label}</title>
-          </circle>
-        </g>
-      ))}
-      <circle cx="100" cy="100" r="3" fill="#38e1ff" />
-    </svg>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Section                                                             */
+/* ------------------------------------------------------------------ */
 
 export default function LiveOps() {
   const feed = useFeed();
   const { ref, inView } = useInView<HTMLElement>();
-  const [, tick] = useReducer((x: number) => x + 1, 0);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    const t = window.setInterval(tick, 1000);
+    const t = window.setInterval(() => setTick((v) => v + 1), 1000);
     return () => window.clearInterval(t);
   }, []);
 
-  const c2 = feed.events.filter((e) => e.source === "FEODO").length;
-  const families = new Set(feed.events.map((e) => e.malware)).size;
-  const okSources = (Object.keys(feed.sources) as LiveSourceId[]).filter((k) => feed.sources[k].status === "ok").length;
-  const frma = feed.events.filter((e) => e.country === "FR" || e.country === "MA").length;
-
-  const topFamilies = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const e of feed.events) counts.set(e.malware, (counts.get(e.malware) ?? 0) + 1);
-    const arr = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-    const max = arr[0]?.[1] ?? 1;
-    return arr.map(([name, n]) => ({ name, n, w: Math.round((n / max) * 100) }));
-  }, [feed.events]);
+  const nextIn = feed.lastRefresh ? Math.max(0, Math.round((feed.lastRefresh + 90_000 - Date.now()) / 1000)) : 0;
+  const okCount = SOURCE_IDS.filter((s) => feed.sources[s].status === "ok").length;
+  const allDead = !feed.loading && okCount === 0;
+  const fams = [...new Map(feed.events.map((e) => [e.malware, e])).values()].slice(0, 6);
 
   return (
-    <section id="flux" ref={ref} className={`reveal ${inView ? "reveal-in" : ""} mx-auto max-w-7xl scroll-mt-24 px-4 sm:px-6`}>
+    <section id="flux" ref={ref} className={`reveal ${inView ? "reveal-in" : ""} mx-auto max-w-7xl scroll-mt-24 px-4 pt-10 sm:px-6`}>
       {/* En-tête */}
-      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.34em] text-cyber">FLUX DE RENSEIGNEMENT — DONNÉES RÉELLES</p>
+          <p className="font-mono text-[11px] tracking-[0.34em] text-cyber">SURVEILLANCE TOTALE — DONNÉES RÉELLES</p>
           <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-snow sm:text-4xl">
-            La toile, sous <span className="text-cyber">veille permanente</span>.
+            Le web, <span className="text-cyber">écouté en direct</span>.
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-fog">
-            Quatre référentiels publics mondiaux alimentent ce mur en continu — aucun événement simulé.
-            Les indicateurs liés à la France et au Maroc sont surlignés automatiquement.
+            Cinq référentiels publics interrogés en continu : indicateurs de compromission, infrastructures de
+            commande, URLs malveillantes, échantillons et vulnérabilités fraîchement publiées.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-3">
+          <div className="border border-line bg-ink-900/70 px-3 py-2 text-right">
+            <p className={`font-display text-[11px] font-bold tracking-[0.18em] ${okCount > 0 ? "text-pulse" : "text-alert"}`}>
+              {okCount}/{SOURCE_IDS.length} RÉFÉRENTIELS EN LIGNE
+            </p>
+            <p className="mt-0.5 font-mono text-[9px] tracking-[0.14em] text-fog-dim">
+              {feed.paused ? "FLUX EN PAUSE" : feed.lastRefresh ? `PROCHAINE ACTUALISATION : ${nextIn} s` : "CONNEXION…"}
+            </p>
+          </div>
           <button
             onClick={() => setPaused(!feed.paused)}
-            className={`flex items-center gap-2 border px-4 py-2.5 font-display text-[10px] font-bold tracking-[0.2em] transition-all ${
-              feed.paused ? "border-warn/60 bg-warn/10 text-warn" : "border-line text-fog hover:border-cyber/60 hover:text-cyber"
-            }`}
+            className="grid h-10 w-10 place-items-center border border-line text-fog transition-colors hover:border-cyber/60 hover:text-cyber"
+            title={feed.paused ? "Reprendre" : "Pause"}
           >
-            {feed.paused ? <IconPlay className="h-3.5 w-3.5" /> : <IconPause className="h-3.5 w-3.5" />}
-            {feed.paused ? "REPRENDRE LE FLUX" : "METTRE EN PAUSE"}
+            {feed.paused ? <IconPlay className="h-4 w-4" /> : <IconPause className="h-4 w-4" />}
           </button>
           <button
-            onClick={() => window.dispatchEvent(new CustomEvent("aegis-refresh"))}
-            className="clip-tag bg-cyber px-5 py-2.5 font-display text-[10px] font-bold tracking-[0.2em] text-ink-950 transition-all hover:bg-snow"
+            onClick={() => { setPaused(false); refreshFeed(); }}
+            className="clip-tag flex h-10 items-center gap-2 bg-cyber px-4 font-display text-[10px] font-bold tracking-[0.18em] text-ink-950 transition-all hover:bg-snow"
           >
-            ACTUALISER
+            <IconRadar className={`h-3.5 w-3.5 ${feed.loading ? "animate-spin" : ""}`} />
+            RÉESSAYER
           </button>
         </div>
       </div>
 
-      {/* État des sources */}
-      <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {(Object.keys(LIVE_SOURCES) as LiveSourceId[]).map((id) => (
-          <SourceCard key={id} id={id} />
-        ))}
-      </div>
-
-      {/* Corps principal */}
-      <div className="mt-5 grid gap-5 lg:grid-cols-12">
-        {/* Journal réel */}
-        <div className="panel overflow-hidden lg:col-span-7">
-          <div className="flex items-center gap-3 border-b border-line px-5 py-3.5">
-            <h3 className="font-display text-xs font-bold tracking-[0.24em] text-snow">JOURNAL DES INDICATEURS</h3>
-            <span className="ml-auto font-mono text-[9px] tracking-[0.16em] text-fog-dim">
-              {feed.loading ? "LECTURE DES FLUX…" : `MAJ ${feed.lastRefresh ? timeAgo(feed.lastRefresh) : "—"} · AUTO 90 s`}
-            </span>
-            {feed.paused && <span className="border border-warn/50 bg-warn/10 px-2 py-0.5 font-mono text-[8px] tracking-[0.16em] text-warn">PAUSE</span>}
-          </div>
-          <ul className="max-h-[520px] overflow-y-auto">
-            {feed.events.length === 0 && (
-              <li className="px-6 py-16 text-center">
-                {feed.loading ? (
-                  <span className="font-mono text-xs text-fog-dim">
-                    <span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border border-cyber border-t-transparent align-middle" />
-                    Interrogation de ThreatFox, Feodo, URLhaus et MalwareBazaar…
+      {/* Cartes de sources */}
+      <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {SOURCE_IDS.map((id) => {
+          const st = feed.sources[id];
+          const meta = LIVE_SOURCES[id];
+          return (
+            <div key={id} className={`panel p-3.5 transition-all duration-300 ${st.status === "ok" ? "hover:border-cyber/50" : ""}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-display text-[10px] font-bold tracking-[0.16em] text-snow">{meta.name.toUpperCase()}</span>
+                {st.status === "loading" ? (
+                  <span className="shrink-0 border border-warn/50 bg-warn/10 px-1.5 py-0.5 font-mono text-[8px] tracking-[0.12em] text-warn">
+                    CONNEXION…
+                  </span>
+                ) : st.status === "ok" ? (
+                  <span className="flex shrink-0 items-center gap-1 border border-pulse/50 bg-pulse/10 px-1.5 py-0.5 font-mono text-[8px] tracking-[0.12em] text-pulse">
+                    <span className="h-1 w-1 animate-pulse-dot rounded-full bg-pulse" /> EN LIGNE
                   </span>
                 ) : (
-                  <span className="font-mono text-xs text-alert">Flux injoignables — vérifiez la connexion réseau.</span>
-                )}
-              </li>
-            )}
-            {feed.events.slice(0, 60).map((e, i) => (
-              <EventRow key={e.id} e={e} index={i} />
-            ))}
-          </ul>
-        </div>
-
-        {/* Colonne synthèse */}
-        <div className="flex flex-col gap-5 lg:col-span-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="panel p-4">
-              <p className="font-display text-2xl font-bold tabular-nums text-snow">{feed.events.length}</p>
-              <p className="mt-1 font-mono text-[9px] tracking-[0.18em] text-fog-dim">IOC RÉCENTS EN MÉMOIRE</p>
-            </div>
-            <div className="panel p-4">
-              <p className="font-display text-2xl font-bold tabular-nums text-alert">{c2}</p>
-              <p className="mt-1 font-mono text-[9px] tracking-[0.18em] text-fog-dim">C2 BOTNETS (FEODO)</p>
-            </div>
-            <div className="panel p-4">
-              <p className="font-display text-2xl font-bold tabular-nums text-warn">{families}</p>
-              <p className="mt-1 font-mono text-[9px] tracking-[0.18em] text-fog-dim">FAMILLES DISTINCTES</p>
-            </div>
-            <div className="panel p-4">
-              <p className="font-display text-2xl font-bold tabular-nums text-cyber">{frma}</p>
-              <p className="mt-1 font-mono text-[9px] tracking-[0.18em] text-fog-dim">IOC LIÉS FR / MA</p>
-            </div>
-          </div>
-
-          {/* Radar réel */}
-          <div className="panel relative flex-1 overflow-hidden p-4">
-            <div className="flex items-center gap-2.5">
-              <IconRadar className="h-4 w-4 text-cyber" />
-              <h3 className="font-display text-xs font-bold tracking-[0.24em] text-snow">CARTE DES CONTACTS RÉELS</h3>
-              <span className="ml-auto font-mono text-[9px] text-fog-dim">{Math.min(26, feed.events.length)} PLOT{feed.events.length > 1 ? "S" : ""}</span>
-            </div>
-            <div className="mt-2 h-[260px]">
-              <LiveRadar events={feed.events} />
-            </div>
-          </div>
-
-          {/* Top familles */}
-          <div className="panel p-4">
-            <h3 className="font-display text-[10px] font-bold tracking-[0.24em] text-fog">FAMILLES LES PLUS ACTIVES</h3>
-            <ul className="mt-3 space-y-2">
-              {topFamilies.length === 0 && <li className="font-mono text-[10px] text-fog-dim">En attente des flux…</li>}
-              {topFamilies.map((f) => (
-                <li key={f.name} className="flex items-center gap-3">
-                  <span className="font-display w-32 shrink-0 truncate text-[11px] font-bold text-snow">{f.name}</span>
-                  <span className="h-2 flex-1 overflow-hidden bg-ink-700">
-                    <span className="block h-full bg-gradient-to-r from-cyber to-alert transition-all duration-700" style={{ width: `${f.w}%` }} />
+                  <span className="shrink-0 border border-alert/50 bg-alert/10 px-1.5 py-0.5 font-mono text-[8px] tracking-[0.12em] text-alert">
+                    INJOIGNABLE
                   </span>
-                  <span className="w-8 shrink-0 text-right font-mono text-[10px] tabular-nums text-fog">{f.n}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+                )}
+              </div>
+              <p className="mt-1.5 truncate font-mono text-[9px] tracking-[0.08em] text-fog-dim" title={meta.org}>{meta.org}</p>
+              <div className="mt-2.5 flex items-center gap-2 border-t border-line/60 pt-2 font-mono text-[9px] tracking-[0.1em]">
+                <span className={st.status === "ok" ? "text-cyber" : "text-fog-dim"}>{st.count} IOC</span>
+                <span className="text-fog-dim">·</span>
+                <span className="text-fog-dim">{st.latency !== null ? `${st.latency} ms` : "—"}</span>
+                {st.updated && <span className="ml-auto text-fog-dim">{timeAgo(st.updated)}</span>}
+              </div>
+              {st.status === "error" && (
+                <p className="mt-1.5 truncate font-mono text-[8px] tracking-[0.08em] text-alert/80" title={st.error}>
+                  ✕ {st.error ?? "erreur inconnue"}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      <p className="mt-4 font-mono text-[9px] tracking-[0.14em] text-fog-dim">
-        SOURCES PUBLIQUES : ABUSE.CH (THREATFOX · FEODO TRACKER · URLHAUS · MALWAREBAZAAR) — INDICATEURS TECHNIQUES UNIQUES, USAGE DÉFENSIF.
-      </p>
+      {/* Exposition du visiteur */}
+      <div className="panel mt-5 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center border border-cyber/40 text-cyber">
+            <IconCrosshair className="h-4 w-4" />
+          </span>
+          <p className="font-display text-[10px] font-bold tracking-[0.24em] text-snow">VOTRE EXPOSITION</p>
+        </div>
+        {feed.exposure ? (
+          <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-1 font-mono text-[11px]">
+            <span className="text-snow">
+              <span className="text-fog-dim">IP publique : </span>
+              <span className="text-cyber">{feed.exposure.ip}</span>
+            </span>
+            <span className="text-fog">
+              {feed.exposure.flag ?? ""} {feed.exposure.city ?? "?"}, {feed.exposure.country ?? "?"}
+            </span>
+            <span className="text-fog">
+              <span className="text-fog-dim">ASN </span>
+              {feed.exposure.asn ?? "?"} · {feed.exposure.org ?? "?"}
+            </span>
+            <span className={`ml-auto border px-2 py-1 text-[9px] tracking-[0.14em] ${feed.exposure.listed ? "border-alert/60 bg-alert/10 text-alert" : "border-pulse/60 bg-pulse/10 text-pulse"}`}>
+              {feed.exposure.listed ? "RÉPERTORIÉE FEODO — COUPER" : "ABSENTE DES LISTES DE BLOCAGE"}
+            </span>
+          </div>
+        ) : (
+          <p className="flex-1 font-mono text-[10px] tracking-[0.1em] text-fog-dim">
+            {feed.exposureError ? `Sonde injoignable — ${feed.exposureError}` : "Mesure de votre adresse publique en cours…"}
+          </p>
+        )}
+      </div>
+
+      {/* Diagnostic honnête si tout échoue */}
+      {allDead && (
+        <div className="panel mt-5 border-alert/50 p-6">
+          <div className="flex items-center gap-3">
+            <IconWarning className="h-6 w-6 text-alert" />
+            <h3 className="font-display text-sm font-bold tracking-[0.22em] text-alert">RÉSEAU EXTERNE INJOIGNABLE DEPUIS CET ENVIRONNEMENT</h3>
+          </div>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-fog">
+            Aucun des cinq référentiels ne répond. Causes probables : environnement de prévisualisation sans accès
+            Internet, proxy ou pare-feu interceptant les requêtes, DNS filtré. Le système ne fabrique aucune donnée —
+            il attend une connexion réelle. Testez ces points d'accès directement, puis relancez :
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[
+              ["Feodo (GET)", "https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.json"],
+              ["Google DoH", "https://dns.google/resolve?name=example.com&type=A"],
+              ["ipify", "https://api.ipify.org?format=json"],
+              ["CIRCL CVE", "https://cve.circl.lu/api/last/5"],
+            ].map(([label, url]) => (
+              <a
+                key={url}
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 border border-line bg-ink-950/50 px-3 py-2 font-mono text-[10px] text-fog transition-colors hover:border-cyber/60 hover:text-cyber"
+              >
+                <IconExternal className="h-3 w-3" /> {label}
+              </a>
+            ))}
+          </div>
+          <button
+            onClick={() => refreshFeed()}
+            className="clip-tag mt-5 bg-alert px-6 py-3 font-display text-[11px] font-bold tracking-[0.22em] text-ink-950 transition-all hover:bg-snow"
+          >
+            RELANCER LA CONNEXION
+          </button>
+        </div>
+      )}
+
+      {/* Radar + journal */}
+      {!allDead && (
+        <>
+          <div className="mt-5 grid gap-5 lg:grid-cols-12">
+            <div className="lg:col-span-5">
+              <RadarPanel events={feed.events} />
+            </div>
+            <div className="panel flex flex-col overflow-hidden lg:col-span-7">
+              <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+                <h2 className="font-display text-xs font-bold tracking-[0.24em] text-snow">JOURNAL DES INDICATEURS RÉELS</h2>
+                <span className="font-mono text-[10px] tracking-[0.16em] text-fog-dim">{feed.events.length} INDICATEURS</span>
+              </div>
+              <div className="max-h-[430px] flex-1 overflow-y-auto">
+                {feed.loading && feed.events.length === 0 ? (
+                  <div className="flex h-40 items-center justify-center">
+                    <span className="h-5 w-5 animate-spin rounded-full border border-cyber border-t-transparent" />
+                    <span className="ml-3 font-mono text-[11px] tracking-[0.16em] text-fog-dim">INTERROGATION DES RÉFÉRENTIELS…</span>
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-line/60">
+                    {feed.events.slice(0, 60).map((e) => (
+                      <li key={e.id} className="animate-row-in flex items-center gap-3 px-5 py-2.5 transition-colors hover:bg-snow/[0.03]">
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${e.severity === 2 ? "bg-alert" : e.severity === 1 ? "bg-warn" : "bg-pulse"}`} />
+                        <span className="w-24 shrink-0 font-mono text-[9px] tracking-[0.08em] text-fog-dim">
+                          {new Date(e.ts).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className={`w-24 shrink-0 truncate border px-1.5 py-0.5 text-center font-mono text-[8px] tracking-[0.1em] ${SOURCE_CHIP[e.source]}`}>
+                          {e.source}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-snow" title={e.ioc}>
+                          {e.ioc}
+                        </span>
+                        <span className="hidden w-28 shrink-0 truncate font-mono text-[10px] text-fog sm:block" title={e.malware}>
+                          {e.malware}
+                        </span>
+                        <span className={`shrink-0 font-mono text-[9px] tracking-[0.1em] ${SEV_COLOR[e.severity]}`}>{SEV_LABEL[e.severity]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="border-t border-line px-5 py-2.5 font-mono text-[9px] tracking-[0.12em] text-fog-dim">
+                FLUX PUBLICS abuse.ch + CIRCL/NVD · Rafraîchissement automatique toutes les 90 s
+              </div>
+            </div>
+          </div>
+
+          {fams.length > 0 && (
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[9px] tracking-[0.22em] text-fog-dim">FAMILLES ACTIVES DANS LE FLUX :</span>
+              {fams.map((f) => (
+                <span key={f.ioc} className="border border-line bg-ink-900/60 px-2.5 py-1 font-mono text-[10px] text-cyber">
+                  {f.malware}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </section>
   );
 }

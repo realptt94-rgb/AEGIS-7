@@ -17,7 +17,7 @@ export interface LiveEvent {
   ts: number;
   source: LiveSourceId;
   ioc: string;
-  iocType: "ip:port" | "domain" | "url" | "sha256";
+  iocType: "ip:port" | "domain" | "url" | "sha256" | "cve";
   malware: string;
   threat: string;
   tags: string[];
@@ -33,9 +33,22 @@ export interface SourceStatus {
   error?: string;
 }
 
+export interface Exposure {
+  ip: string;
+  city?: string;
+  country?: string;
+  flag?: string;
+  org?: string;
+  asn?: number | string;
+  listed: boolean;
+  ts: number;
+}
+
 export interface FeedState {
   events: LiveEvent[];
   sources: Record<LiveSourceId, SourceStatus>;
+  exposure: Exposure | null;
+  exposureError: string | null;
   loading: boolean;
   lastRefresh: number;
   paused: boolean;
@@ -46,9 +59,18 @@ const initialSources = (): Record<LiveSourceId, SourceStatus> => ({
   FEODO: { status: "loading", count: 0, latency: null, updated: null },
   URLHAUS: { status: "loading", count: 0, latency: null, updated: null },
   MALWAREBAZAAR: { status: "loading", count: 0, latency: null, updated: null },
+  CVE: { status: "loading", count: 0, latency: null, updated: null },
 });
 
-let state: FeedState = { events: [], sources: initialSources(), loading: true, lastRefresh: 0, paused: false };
+let state: FeedState = {
+  events: [],
+  sources: initialSources(),
+  exposure: null,
+  exposureError: null,
+  loading: true,
+  lastRefresh: 0,
+  paused: false,
+};
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 const setState = (p: Partial<FeedState>) => {
@@ -162,6 +184,86 @@ async function fetchUrlhaus(): Promise<LiveEvent[]> {
   }));
 }
 
+async function fetchCve(): Promise<LiveEvent[]> {
+  /* CIRCL d'abord, NVD en repli */
+  try {
+    const j = await jfetch("https://cve.circl.lu/api/last/30", {}, 12000);
+    const items = Array.isArray(j) ? j : [];
+    if (items.length) {
+      return items.map((c: any, i: number): LiveEvent => {
+        const id = String(c?.id ?? c?.cve?.id ?? `CVE-${i}`);
+        const summary = String(c?.summary ?? c?.cve?.descriptions?.find((d: any) => d.lang === "en")?.value ?? "");
+        return {
+          id,
+          ts: Date.parse(c?.Published ?? c?.published ?? c?.cve?.published ?? "") || Date.now(),
+          source: "CVE",
+          ioc: id,
+          iocType: "cve",
+          malware: "CVE",
+          threat: summary.slice(0, 90) || "vulnérabilité publiée",
+          tags: [],
+          severity: /remote|arbitrary|exécution|execution/i.test(summary) ? 2 : 1,
+        };
+      });
+    }
+  } catch {
+    /* bascule NVD */
+  }
+  const j = await jfetch(
+    "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=30",
+    {},
+    14000
+  );
+  const vulns = Array.isArray(j?.vulnerabilities) ? j.vulnerabilities : [];
+  return vulns.map((v: any, i: number): LiveEvent => {
+    const c = v?.cve ?? {};
+    const id = String(c.id ?? `CVE-${i}`);
+    const desc = String(c.descriptions?.find((d: any) => d.lang === "en")?.value ?? "");
+    return {
+      id,
+      ts: Date.parse(c.published ?? "") || Date.now(),
+      source: "CVE",
+      ioc: id,
+      iocType: "cve",
+      malware: "CVE",
+      threat: desc.slice(0, 90) || "vulnérabilité publiée",
+      tags: [],
+      severity: /remote|arbitrary|exécution|execution/i.test(desc) ? 2 : 1,
+    };
+  });
+}
+
+/* Sonde d'exposition : la vraie adresse publique du visiteur */
+async function updateExposure(): Promise<void> {
+  try {
+    const j = await jfetch("https://api.ipify.org?format=json", {}, 10000);
+    const ip = String(j?.ip ?? "");
+    if (!ip) throw new Error("pas d'IP");
+    let geo: any = null;
+    try {
+      geo = await geoIp(ip);
+    } catch {
+      geo = null;
+    }
+    const listed = feodoMatch(ip) !== null;
+    setState({
+      exposure: {
+        ip,
+        city: geo?.city,
+        country: geo?.country,
+        flag: geo?.flag?.emoji,
+        org: geo?.connection?.org,
+        asn: geo?.connection?.asn,
+        listed,
+        ts: Date.now(),
+      },
+      exposureError: null,
+    });
+  } catch (e: any) {
+    setState({ exposureError: String(e?.message ?? e) });
+  }
+}
+
 async function fetchMalwareBazaar(): Promise<LiveEvent[]> {
   const j = await jfetch("https://mb-api.abuse.ch/api/v1/", {
     method: "POST",
@@ -200,6 +302,7 @@ export async function refreshFeed(): Promise<void> {
     ["FEODO", fetchFeodo],
     ["URLHAUS", fetchUrlhaus],
     ["MALWAREBAZAAR", fetchMalwareBazaar],
+    ["CVE", fetchCve],
   ];
   const results = await Promise.all(
     fetchers.map(async ([id, fn]) => {
@@ -224,6 +327,7 @@ export async function refreshFeed(): Promise<void> {
   }
   const events = [...merged.values()].sort((a, b) => b.ts - a.ts).slice(0, 300);
   setState({ events, sources, loading: false, lastRefresh: now });
+  updateExposure();
 }
 
 /* ------------------------------------------------------------------ */

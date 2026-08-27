@@ -307,11 +307,12 @@ export const SWARM_EXAMPLES = [
 
 export const BRAVE_API_KEY = "BSAq1DN5k0fnKRNudkcPittnCR0SuMV";
 
-export type LiveSourceId = "THREATFOX" | "FEODO" | "URLHAUS" | "MALWAREBAZAAR";
+export type LiveSourceId = "THREATFOX" | "FEODO" | "URLHAUS" | "MALWAREBAZAAR" | "CVE";
 
 export const LIVE_SOURCES: Record<LiveSourceId, { name: string; org: string }> = {
   THREATFOX: { name: "ThreatFox", org: "abuse.ch — IOC mondiaux" },
   FEODO: { name: "Feodo Tracker", org: "abuse.ch — C2 botnets" },
   URLHAUS: { name: "URLhaus", org: "abuse.ch — URLs malveillantes" },
   MALWAREBAZAAR: { name: "MalwareBazaar", org: "abuse.ch — échantillons" },
+  CVE: { name: "CVE Watch", org: "CIRCL → NVD — vulnérabilités publiées" },
 };
