@@ -37,7 +37,7 @@ export function StatsBand() {
     >
       <div className="panel grid grid-cols-2 lg:grid-cols-4">
         <Stat value={1284509} label="ATTAQUES NEUTRALISÉES / 30 J" delay={0} />
-        <Stat value={96} label="PAYS D'ORIGINE PISTÉS" delay={150} />
+        <Stat value={146} label="OPÉRATEURS FR & MA SOUS GARDE" delay={150} />
         <Stat value={99.2} suffix="%" decimals={1} label="TAUX DE DÉTECTION" delay={300} />
         <Stat value={38} suffix=" ms" label="RÉPONSE MOYENNE" delay={450} />
       </div>

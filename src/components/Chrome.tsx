@@ -73,6 +73,9 @@ export function TopBar() {
             <span className="h-2 w-2 rounded-full bg-pulse animate-pulse-dot" />
             <span className="font-mono text-[10px] tracking-[0.2em] text-pulse">EN LIGNE</span>
           </div>
+          <span className="hidden border border-cyber/40 bg-cyber/10 px-2 py-1 font-mono text-[9px] tracking-[0.2em] text-cyber md:block">
+            PÉRIMÈTRE FR + MA
+          </span>
           <div className="hidden text-right md:block">
             <div className="font-mono text-xs text-snow tabular-nums">{uptime}</div>
             <div className="font-mono text-[9px] tracking-[0.18em] text-fog-dim">UPTIME SESSION</div>

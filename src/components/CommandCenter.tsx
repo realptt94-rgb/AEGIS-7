@@ -289,7 +289,7 @@ export default function CommandCenter() {
           <div className="panel panel-corner relative overflow-hidden">
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
               <h2 className="flex items-center gap-2.5 font-display text-xs font-bold tracking-[0.24em] text-snow">
-                <IconRadar className="h-4 w-4 text-cyber" /> BALAYAGE PÉRIMÉTRIQUE
+                <IconRadar className="h-4 w-4 text-cyber" /> BALAYAGE PÉRIMÉTRIQUE — FR + MA
               </h2>
               <span className="font-mono text-[10px] tracking-[0.16em] text-fog-dim">
                 {blips.length} CONTACT{blips.length > 1 ? "S" : ""}

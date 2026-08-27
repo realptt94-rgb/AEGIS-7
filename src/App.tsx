@@ -40,11 +40,12 @@ function ClosingBanner() {
           <h2 className="font-display mx-auto mt-6 max-w-2xl text-3xl font-bold leading-tight tracking-tight text-snow sm:text-4xl">
             Les cybercriminels automatisent leurs attaques.
             <br />
-            <span className="text-cyber text-glitch-shadow">Automatisez votre défense.</span>
+            <span className="text-cyber text-glitch-shadow">De Paris à Casablanca, automatisez la vôtre.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-fog">
-            AEGIS-7 monte la garde pendant que vous dormez. Testez un artefact suspect ou observez
-            la console en action — l'agent s'occupe du reste.
+            AEGIS-7 concentre actuellement sa veille sur la France et le Maroc : faux sites Ameli,
+            CAF et DGI, arnaques OTP Barid Bank, raids sur Telegram. Testez un artefact suspect ou
+            interrogez l'essaim — l'agent s'occupe du reste.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a

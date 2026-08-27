@@ -35,9 +35,17 @@ const STEP_SETS: Record<Tab, string[]> = {
 };
 
 const EXAMPLES: Record<Tab, string[]> = {
-  url: ["https://paypa1-secure-verify.xyz/login?id=8841", "https://www.impots-gouv-fr.info/remboursement", "https://docs.entreprise-partage.fr/rapport-q3"],
-  email: ["urgent-suspension@banque-fr.net", "direction.rh@groupe-total.energy", "gain-loterie@win-prize.tk"],
-  ip: ["185.220.101.47", "8.8.8.8", "45.155.205.86"],
+  url: [
+    "https://ameli-remboursement-securise.top/cartevitale",
+    "https://www.impots-gouv-fr.info/remboursement",
+    "https://compte-mar0ctelecom.ma-factures.xyz/connexion",
+  ],
+  email: [
+    "remboursement@ameli-cpam.top",
+    "support@dgi-maroc.org",
+    "direction.rh@banque-populaire.energy",
+  ],
+  ip: ["105.158.44.17", "81.252.114.33", "8.8.8.8"],
 };
 
 interface Finding {
@@ -62,6 +70,9 @@ function analyze(tab: Tab, raw: string): Verdict {
   if (tab === "url") {
     if (/xn--/.test(s)) { risk += 24; findings.push({ label: "Domaine punycode — homoglyphes détectés", tone: "bad" }); }
     if (/\.(zip|tk|xyz|top|click|gq|ml)\b/.test(s)) { risk += 22; findings.push({ label: "TLD à fort taux d'abus (.xyz, .tk…)", tone: "bad" }); }
+    if (/(ameli|arneli|cpam|impots|gouv|caf|dgi|cnss|barid|maroctelecom|mar0ctelecom|iam-|banque|tresor)/.test(s) && /\.(tk|xyz|top|click|gq|ml|info)\b/.test(s)) {
+      risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS, Maroc Telecom…)", tone: "bad" });
+    }
     if (/https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(s)) { risk += 20; findings.push({ label: "URL en adresse IP brute — masque d'hameçonnage", tone: "bad" }); }
     if (/http:\/\//.test(s)) { risk += 12; findings.push({ label: "Transport non chiffré (HTTP simple)", tone: "warn" }); }
     if (s.includes("@")) { risk += 16; findings.push({ label: "Caractère « @ » dans l'URL — redirection masquée", tone: "warn" }); }
@@ -72,10 +83,13 @@ function analyze(tab: Tab, raw: string): Verdict {
   } else if (tab === "email") {
     if (!s.includes("@")) { risk += 50; findings.push({ label: "Format d'adresse invalide", tone: "bad" }); }
     const domain = s.split("@")[1] || "";
-    if (/(urgent|suspendu|virement|mot.de.passe|gain|loterie|colis)/.test(s)) { risk += 20; findings.push({ label: "Lexique d'urgence sociale détecté", tone: "bad" }); }
+    if (/(urgent|suspendu|virement|mot.de.passe|gain|loterie|colis|remboursement|otp|code de)/.test(s)) { risk += 20; findings.push({ label: "Lexique d'urgence sociale détecté", tone: "bad" }); }
     if (/\.(tk|xyz|top|ml|click)$/.test(domain)) { risk += 22; findings.push({ label: "Domaine jetable à fort taux d'abus", tone: "bad" }); }
     if (/(\d{1,3}\.){3}\d{1,3}$/.test(domain)) { risk += 20; findings.push({ label: "Domaine en IP littérale", tone: "bad" }); }
-    if (/(banque|impots|paypal|netflix|microsoft|total)/.test(s) && !/\.(fr|com|net|org)$/.test(domain)) { risk += 16; findings.push({ label: "Usurpation de marque probable", tone: "warn" }); }
+    const govBrand = /(dgi|impots|gouv|ameli|cpam|caf|cnss|barid|maroctelecom|banque|tresor)/.test(s);
+    if (govBrand && !/\.(fr|com|net|org)$/.test(domain)) { risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS…)", tone: "bad" }); }
+    if (govBrand && /\.(fr|com|net|org)$/.test(domain) && domain.split(".").length === 2) { risk += 10; findings.push({ label: "Domaine institutionnel prétendu — vérifier l'expéditeur officiel", tone: "warn" }); }
+    if (/(paypal|netflix|microsoft|total|orange|sfr|free)/.test(s) && !/\.(fr|com|net|org)$/.test(domain)) { risk += 16; findings.push({ label: "Usurpation de marque probable", tone: "warn" }); }
     if (domain.split(".").length < 2) { risk += 10; findings.push({ label: "Suffixe de domaine incomplet", tone: "warn" }); }
     if (risk < 30) findings.push({ label: "Alignement SPF/DKIM/DMARC conforme", tone: "ok" }, { label: "Expéditeur connu, historique sain", tone: "ok" });
   } else {

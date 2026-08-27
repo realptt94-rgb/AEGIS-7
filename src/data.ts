@@ -35,37 +35,33 @@ export interface Origin {
 }
 
 export const ORIGINS: Origin[] = [
-  { ip: "185.220.101.47", city: "Francfort", cc: "DE" },
-  { ip: "91.242.217.9", city: "Saint-Pétersbourg", cc: "RU" },
-  { ip: "45.155.205.86", city: "Amsterdam", cc: "NL" },
-  { ip: "103.75.190.11", city: "Hanoï", cc: "VN" },
-  { ip: "196.251.72.140", city: "Lagos", cc: "NG" },
-  { ip: "177.54.144.208", city: "São Paulo", cc: "BR" },
-  { ip: "5.62.61.133", city: "Téhéran", cc: "IR" },
-  { ip: "116.105.77.29", city: "Hô Chi Minh-Ville", cc: "VN" },
-  { ip: "89.248.174.66", city: "Rotterdam", cc: "NL" },
-  { ip: "62.76.188.12", city: "Moscou", cc: "RU" },
-  { ip: "14.224.163.55", city: "Manille", cc: "PH" },
-  { ip: "197.210.64.97", city: "Abuja", cc: "NG" },
-  { ip: "31.210.20.184", city: "Izmir", cc: "TR" },
-  { ip: "94.232.43.71", city: "Minsk", cc: "BY" },
-  { ip: "36.92.111.18", city: "Jakarta", cc: "ID" },
-  { ip: "175.111.181.6", city: "Dacca", cc: "BD" },
+  { ip: "105.158.44.17", city: "Casablanca", cc: "MA" },
+  { ip: "41.140.202.88", city: "Rabat", cc: "MA" },
+  { ip: "196.200.132.5", city: "Marrakech", cc: "MA" },
+  { ip: "105.159.77.210", city: "Tanger", cc: "MA" },
+  { ip: "41.251.66.12", city: "Agadir", cc: "MA" },
+  { ip: "160.176.35.90", city: "Oujda", cc: "MA" },
+  { ip: "81.252.114.33", city: "Paris", cc: "FR" },
+  { ip: "90.84.17.201", city: "Lyon", cc: "FR" },
+  { ip: "37.166.45.9", city: "Marseille", cc: "FR" },
+  { ip: "78.126.89.144", city: "Toulouse", cc: "FR" },
+  { ip: "2.10.177.58", city: "Strasbourg", cc: "FR" },
+  { ip: "176.152.66.27", city: "Lille", cc: "FR" },
 ];
 
 export const ACTIONS = ["NEUTRALISÉ", "BLOQUÉ", "QUARANTAINE", "LEURRÉ (HONEYPOT)"] as const;
 
 export const TARGETS = [
-  "passerelle-paiement",
-  "serveur-auth",
-  "api-utilisateurs",
-  "port 443 (HTTPS)",
-  "port 22 (SSH)",
-  "base clients CRM",
-  "boîte mail direction",
-  "portail employés",
-  "DNS interne",
-  "coffre-fort secrets",
+  "passerelle CB — Paris",
+  "portail CAF",
+  "SI hôpital — Lyon",
+  "API Ameli",
+  "banque centrale — Rabat",
+  "CNSS — espace assuré",
+  "Maroc Telecom — comptes",
+  "Barid Bank — virements",
+  "port 22 (SSH) — VPS Gravelines",
+  "transfert de fonds — Casablanca",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -136,9 +132,9 @@ export const MODULES: DefenseModule[] = [
     id: "phishing",
     title: "Bouclier anti-hameçonnage",
     code: "MOD-02",
-    desc: "Analyse sémantique des messages et des URL : domaines jumeaux, homoglyphes, leurres de marque. Les liens reçus sur Telegram et par mail sont pré-détonnés en bac à sable.",
+    desc: "Analyse sémantique des messages et des URL : domaines jumeaux, homoglyphes, leurres de marque. Les faux sites Ameli, CAF, impôts, DGI ou Maroc Telecom sont pré-détonnés en bac à sable avant diffusion.",
     status: "ACTIF",
-    metric: "18 400 leurrs bloqués / 24 h",
+    metric: "18 400 leurres FR & MA bloqués / 24 h",
     span: "lg:col-span-4",
   },
   {
@@ -154,16 +150,16 @@ export const MODULES: DefenseModule[] = [
     id: "torwatch",
     title: "Vigie Tor & darknet",
     code: "MOD-04",
-    desc: "Crawlers TorBot surveillent les places de marché .onion à la recherche de données volées vous concernant. Alerte immédiate si des identifiants fuient.",
+    desc: "Crawlers TorBot surveillent les places de marché .onion où se revendent les bases françaises et marocaines volées. Alerte immédiate si des identifiants ou fichiers clients fuient.",
     status: "EN PATROUILLE",
-    metric: "312 marchés scrutés",
+    metric: "312 marchés scrutés — focus FR/MA",
     span: "lg:col-span-4",
   },
   {
     id: "tgwatch",
     title: "Écoute défensive Telegram",
     code: "MOD-05",
-    desc: "Surveille les canaux et groupes où s'organisent raids, fuites et ventes d'accès. Détecte les campagnes de membres forcés et les bots d'arnaque avant qu'ils ne frappent.",
+    desc: "Surveille les canaux et groupes francophones et marocains où s'organisent raids, fuites et ventes d'accès. Détecte les campagnes de membres forcés et les bots d'arnaque avant qu'ils ne frappent.",
     status: "1 024 CANAUX",
     metric: "46 campagnes détectées",
     span: "lg:col-span-4",
@@ -172,7 +168,7 @@ export const MODULES: DefenseModule[] = [
     id: "soar",
     title: "Riposte automatisée SOAR",
     code: "MOD-06",
-    desc: "Orchestre la contre-mesure : isolement d'hôte, coupure de session, blocage ASN, dépôt de preuve horodatée. Chaque action est journalisée et réversible.",
+    desc: "Orchestre la contre-mesure : isolement d'hôte, coupure de session, blocage ASN, dépôt de preuve horodatée. Chaque action est journalisée, réversible et alignée sur les procédures ANSSI (France) et DGSSI (Maroc).",
     status: "PRÊT",
     metric: "38 ms de latence moyenne",
     span: "lg:col-span-4",
@@ -206,7 +202,7 @@ export const PHASES = [
     n: "04",
     title: "Rapport & apprentissage",
     desc: "Dossier de preuve horodaté, prêt pour dépôt de plainte. L'attaque alimente l'entraînement des modèles : la même technique ne passera plus.",
-    detail: "Export : PDF, STIX/TAXII, chaîne de custody",
+    detail: "Dossier prêt pour dépôt : cybermalveillance.gouv.fr (FR) & DGSSI (MA) — export STIX/TAXII",
   },
 ];
 
@@ -215,16 +211,16 @@ export const PHASES = [
 /* ------------------------------------------------------------------ */
 
 export const TICKER_ITEMS = [
-  "185.220.101.47 (Tor exit node) — accès refusé ×3",
-  "Campagne de phishing Telegram « FAKE-INVEST » détectée — 1 204 canaux signalés",
-  "Signature ransomware « BlackLotus-7 » ajoutée au référentiel",
-  "Scan darknet terminé : 0 fuite de données identifiée",
-  "Mise à jour du modèle neuronal NX-2 — précision +0,8 %",
-  "46 bots d'arnaque bannis via coordination OSINT",
-  "Tentative d'injection SQL sur api-utilisateurs — requête neutralisée",
-  "Honeypot HP-3 : 17 attaquants piégés cette nuit",
-  "Rotation automatique des secrets effectuée (coffre-fort)",
-  "Veille .onion : 312 marchés scrutés, 2 alertes remontées",
+  "Campagne « Ameli-remboursement » — 2 400 leurres bloqués en France",
+  "105.158.44.17 (Casablanca) — force brute sur portail CNSS neutralisée",
+  "Faux site « DGI Maroc » repéré sur Telegram — 38 canaux signalés à la DGSSI",
+  "Scan darknet terminé : 0 fuite de données d'entreprises françaises",
+  "Vague « faux support Maroc Telecom » — signature vocale ajoutée au moteur",
+  "Signalement synchronisé avec l'ANSSI — 12 IOCs partagés",
+  "Hameçonnage CPF (Compte Formation) — domaine leurre en .xyz démantelé",
+  "Honeypot Paris-2 : 9 attaquants piégés cette nuit",
+  "Barid Bank : tentative de fraude au virement bloquée — 148 000 MAD",
+  "Veille Telegram : groupes « Marocains du Monde » sous protection renforcée",
   "Essaim agentique : 26 unités IA en ligne — superviseurs, garde-fous, LLM, mémoires mem0, ouvrières",
   "OUV-01 disponible pour analyse en flux temps réel via OpenRouter",
 ];
@@ -299,8 +295,8 @@ export const PIPELINE: PipelineStep[] = [
 ];
 
 export const SWARM_EXAMPLES = [
-  "E-mail reçu : « Votre colis est bloqué, réglez 1,99 € via bit.ly/3xKp9 » — expéditeur colis@chron0-livraison.top",
-  "L'IP 185.220.101.47 scanne notre port 22 toutes les 4 secondes depuis 2 h",
-  "Un « collègue » me demande mes identifiants VPN par message Telegram",
-  "Notre site WordPress redirige parfois vers une page en .xyz",
+  "E-mail « Ameli : remboursement de 284,90 € » — expéditeur ameli@cpam-remboursement.top",
+  "Un compte Telegram « Barid Bank Support » me demande mon code OTP par message",
+  "L'IP 105.158.44.17 scanne notre serveur de Casablanca toutes les 4 secondes depuis 2 h",
+  "Notre boutique en ligne (Paris) redirige parfois les clients vers une page en .xyz",
 ];
