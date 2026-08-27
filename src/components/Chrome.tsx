@@ -5,6 +5,7 @@ import { IconShieldCore } from "./Icons";
 const NAV = [
   { href: "#console", label: "Console" },
   { href: "#analyse", label: "Analyse" },
+  { href: "#essaim", label: "Essaim IA" },
   { href: "#modules", label: "Modules" },
   { href: "#renseignement", label: "Renseignement" },
   { href: "#riposte", label: "Riposte" },

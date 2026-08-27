@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { mulberry32, seedFrom, useInView } from "../hooks";
-import { IconCheck, IconCopy, IconCrosshair, IconFingerprint, IconGlobe, IconPlane, IconWarning } from "./Icons";
+import { IconBolt, IconCheck, IconCopy, IconCrosshair, IconFingerprint, IconGlobe, IconPlane, IconWarning } from "./Icons";
 
 type Tab = "url" | "email" | "ip";
 
@@ -337,13 +337,30 @@ export default function Scanner() {
                 ))}
               </ul>
 
-              <button
-                onClick={copyReport}
-                className="mt-6 flex w-full items-center justify-center gap-2 border border-line py-2.5 font-display text-[11px] font-bold tracking-[0.2em] text-fog transition-all hover:border-cyber/70 hover:text-cyber"
-              >
-                {copied ? <IconCheck className="h-4 w-4 text-pulse" /> : <IconCopy className="h-4 w-4" />}
-                {copied ? "RAPPORT COPIÉ" : "COPIER LE RAPPORT"}
-              </button>
+              <div className="mt-6 grid grid-cols-2 gap-2">
+                <button
+                  onClick={copyReport}
+                  className="flex items-center justify-center gap-2 border border-line py-2.5 font-display text-[11px] font-bold tracking-[0.2em] text-fog transition-all hover:border-cyber/70 hover:text-cyber"
+                >
+                  {copied ? <IconCheck className="h-4 w-4 text-pulse" /> : <IconCopy className="h-4 w-4" />}
+                  {copied ? "COPIÉ" : "COPIER"}
+                </button>
+                <button
+                  onClick={() => {
+                    if (!verdict) return;
+                    window.dispatchEvent(
+                      new CustomEvent("aegis-escalate", {
+                        detail: `Analyse laboratoire (${tab}) : ${input.trim()} — verdict ${verdict.level}, score de risque ${verdict.score}/100.`,
+                      })
+                    );
+                    document.getElementById("essaim")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="flex items-center justify-center gap-2 border border-cyber/50 bg-cyber/10 py-2.5 font-display text-[11px] font-bold tracking-[0.2em] text-cyber transition-all hover:bg-cyber hover:text-ink-950"
+                >
+                  <IconBolt className="h-4 w-4" />
+                  À L'ESSAIM
+                </button>
+              </div>
             </div>
           )}
         </div>

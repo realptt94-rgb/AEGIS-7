@@ -225,4 +225,82 @@ export const TICKER_ITEMS = [
   "Honeypot HP-3 : 17 attaquants piégés cette nuit",
   "Rotation automatique des secrets effectuée (coffre-fort)",
   "Veille .onion : 312 marchés scrutés, 2 alertes remontées",
+  "Essaim agentique : 26 unités IA en ligne — superviseurs, garde-fous, LLM, mémoires mem0, ouvrières",
+  "OUV-01 disponible pour analyse en flux temps réel via OpenRouter",
+];
+
+/* ------------------------------------------------------------------ */
+/* Essaim d'agents IA — Puter.js / OpenRouter                          */
+/* ------------------------------------------------------------------ */
+
+export const PUTER_TOKEN =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InYyIn0.eyJ0IjoidCIsInYiOiIyIiwidG9rZW5fdWlkIjoiYTlmZDk3OWItMDgzMy00ZTFlLWJkNzgtMTliY2Q1YzUxM2VhIiwidXUiOiJGeDA3UThEb1NSQ3hvNW9DbGpwMHZ3PT0iLCJzdSI6IjBJNmZGdUFBUkN5L1hxNk53bXQvbnc9PSIsImFpIjoiRngwN1E4RG9TUkN4bzVvQ2xqcDB2dz09IiwiZnVsbF9hY2Nlc3MiOnRydWUsImlhdCI6MTc4NDc1NTgxNH0.znY4DGWa0Tg7c-m4lLmoeLg3dVX27V24LAmerZuBKMg";
+
+export type AgentRole = "superviseur" | "gardefou" | "llm" | "memoire" | "ouvriere";
+
+export interface AgentDef {
+  id: string;
+  role: AgentRole;
+  duty: string;
+  model?: string;
+  tag?: string;
+}
+
+export const ROLE_META: Record<AgentRole, { label: string; hex: string; blurb: string }> = {
+  superviseur: { label: "SUPERVISEURS", hex: "#b18cff", blurb: "Orchestrent l'essaim, routent et arbitrent les verdicts." },
+  gardefou: { label: "GARDE-FOUS", hex: "#ff4d5e", blurb: "Valident entrées et sorties — aucune dérive offensive tolérée." },
+  llm: { label: "MOTEURS LLM", hex: "#38e1ff", blurb: "Huit modèles de fournisseurs différents, vote de consensus." },
+  memoire: { label: "MÉMOIRE", hex: "#43f08d", blurb: "Huit banques, dont quatre adossées à mem0 — l'essaim n'oublie jamais." },
+  ouvriere: { label: "OUVRIÈRES", hex: "#ffb020", blurb: "Exécutent le travail d'analyse : détonation, triage, extraction, rapport." },
+};
+
+export const AGENTS: AgentDef[] = [
+  { id: "SUP-01", role: "superviseur", duty: "Dispatch & routage des requêtes", model: "x-ai/grok-4.20-multi-agent" },
+  { id: "SUP-02", role: "superviseur", duty: "Synthèse, arbitrage & verdict final", model: "qwen/qwen3-max-thinking" },
+  { id: "GF-01", role: "gardefou", duty: "Filtre d'entrée — refuse les demandes offensives", model: "meta-llama/llama-guard-4-12b" },
+  { id: "GF-02", role: "gardefou", duty: "Filtre de sortie — bloque tout contenu offensif", model: "openai/gpt-oss-safeguard-20b" },
+  { id: "LLM-01", role: "llm", duty: "Moteur généraliste n°1", model: "deepseek/deepseek-v3.2" },
+  { id: "LLM-02", role: "llm", duty: "Moteur rapide basse latence", model: "google/gemini-2.5-flash" },
+  { id: "LLM-03", role: "llm", duty: "Raisonnement court & triage", model: "anthropic/claude-3.5-haiku" },
+  { id: "LLM-04", role: "llm", duty: "Moteur multilingue", model: "mistralai/mistral-small-3.2-24b-instruct" },
+  { id: "LLM-05", role: "llm", duty: "Moteur open weights 70B", model: "meta-llama/llama-3.3-70b-instruct" },
+  { id: "LLM-06", role: "llm", duty: "Analyse de code & scripts", model: "qwen/qwen3-coder-480b-a35b-instruct" },
+  { id: "LLM-07", role: "llm", duty: "Longue fenêtre contextuelle", model: "nvidia/nemotron-3-super-120b-a12b" },
+  { id: "LLM-08", role: "llm", duty: "Moteur de repli généraliste", model: "z-ai/glm-5.2" },
+  { id: "MEM-01", role: "memoire", duty: "Banque d'incidents", model: "openai/gpt-5.4-nano", tag: "mem0" },
+  { id: "MEM-02", role: "memoire", duty: "Référentiel d'IOC", model: "openai/gpt-5.4-nano", tag: "mem0" },
+  { id: "MEM-03", role: "memoire", duty: "Historique de verdicts", tag: "mem0" },
+  { id: "MEM-04", role: "memoire", duty: "Campagnes adverses connues", tag: "mem0" },
+  { id: "MEM-05", role: "memoire", duty: "Graphe d'entités malveillantes", tag: "graphe" },
+  { id: "MEM-06", role: "memoire", duty: "Cache LRU des artefacts vus", tag: "cache" },
+  { id: "MEM-07", role: "memoire", duty: "Mémoire épisodique des ripostes", tag: "épisode" },
+  { id: "MEM-08", role: "memoire", duty: "Playbooks & procédures appris", tag: "procédure" },
+  { id: "OUV-01", role: "ouvriere", duty: "Analyste primaire (flux temps réel)", model: "openai/gpt-oss-20b" },
+  { id: "OUV-02", role: "ouvriere", duty: "Pré-détonation d'URL", model: "google/gemma-4-31b-it" },
+  { id: "OUV-03", role: "ouvriere", duty: "Triage phishing", model: "microsoft/phi-4" },
+  { id: "OUV-04", role: "ouvriere", duty: "Extraction d'IOC", model: "moonshotai/kimi-k2.5" },
+  { id: "OUV-05", role: "ouvriere", duty: "Rédaction de rapports", model: "stepfun/step-3.5-flash" },
+  { id: "OUV-06", role: "ouvriere", duty: "Recoupement darknet", model: "tencent/hunyuan-a13b-instruct" },
+];
+
+export interface PipelineStep {
+  agent: string;
+  label: string;
+  kind: "LOCAL" | "IA" | "IA · STREAM" | "MEM0";
+}
+
+export const PIPELINE: PipelineStep[] = [
+  { agent: "SUP-01", label: "Routage de la requête vers la chaîne d'analyse", kind: "LOCAL" },
+  { agent: "GF-01", label: "Garde-fou d'entrée — llama-guard 4 (12B)", kind: "IA" },
+  { agent: "OUV-01", label: "Analyse ouvrière en flux temps réel", kind: "IA · STREAM" },
+  { agent: "MEM-01", label: "Rappel mem0 puis écriture en banque", kind: "MEM0" },
+  { agent: "SUP-02", label: "Synthèse superviseur & verdict", kind: "IA" },
+  { agent: "GF-02", label: "Garde-fou de sortie — filtrage local", kind: "LOCAL" },
+];
+
+export const SWARM_EXAMPLES = [
+  "E-mail reçu : « Votre colis est bloqué, réglez 1,99 € via bit.ly/3xKp9 » — expéditeur colis@chron0-livraison.top",
+  "L'IP 185.220.101.47 scanne notre port 22 toutes les 4 secondes depuis 2 h",
+  "Un « collègue » me demande mes identifiants VPN par message Telegram",
+  "Notre site WordPress redirige parfois vers une page en .xyz",
 ];

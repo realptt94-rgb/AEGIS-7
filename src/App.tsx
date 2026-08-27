@@ -1,5 +1,6 @@
 import CommandCenter from "./components/CommandCenter";
 import Scanner from "./components/Scanner";
+import Swarm from "./components/Swarm";
 import { Footer, Ticker, TopBar } from "./components/Chrome";
 import { Intel, Modules, Playbook, StatsBand } from "./components/Sections";
 import { useInView } from "./hooks";
@@ -76,6 +77,7 @@ export default function App() {
         <CommandCenter />
         <StatsBand />
         <Scanner />
+        <Swarm />
         <Modules />
         <Intel />
         <Playbook />
