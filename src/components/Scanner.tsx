@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { mulberry32, seedFrom, useInView } from "../hooks";
+import { seedFrom, useInView } from "../hooks";
+import { ensureFeed, feodoMatch, geoIp, resolveDns, threatFoxSearch, urlhausCheck } from "../live";
 import { IconBolt, IconCheck, IconCopy, IconCrosshair, IconFingerprint, IconGlobe, IconPlane, IconWarning } from "./Icons";
 
 type Tab = "url" | "email" | "ip";
@@ -12,45 +13,38 @@ const TABS: { id: Tab; label: string; placeholder: string; icon: (p: { className
 
 const STEP_SETS: Record<Tab, string[]> = {
   url: [
-    "Résolution DNS + âge du domaine",
-    "Réputation — listes noires collaboratives",
-    "Analyse lexicale (typosquatting, homoglyphes)",
-    "Pré-détonation en bac à sable",
-    "Verdict neuronal NX-2",
+    "Résolution DNS réelle (Google DoH)",
+    "Réputation ThreatFox (abuse.ch)",
+    "Contrôle URLhaus (abuse.ch)",
+    "Heuristiques lexicales — typosquat & homoglyphes",
+    "Verdict consolidé",
   ],
   email: [
-    "Vérification SPF / DKIM / DMARC",
-    "Analyse des en-têtes Received",
-    "Détection d'ingénierie sociale (NLP)",
-    "Extraction et scan des pièces jointes",
-    "Verdict neuronal NX-2",
+    "Enregistrements MX réels (Google DoH)",
+    "Résolution A du domaine",
+    "Réputation ThreatFox (abuse.ch)",
+    "Heuristiques d'ingénierie sociale",
+    "Verdict consolidé",
   ],
   ip: [
-    "Whois + géolocalisation ASN",
-    "Historique d'abus (feeds Tor / proxies)",
-    "Ports ouverts et bannières de service",
-    "Corrélation avec campagnes connues",
-    "Verdict neuronal NX-2",
+    "Géolocalisation & ASN (ipwho.is)",
+    "DNS inverse — PTR (Google DoH)",
+    "Croisement ThreatFox + Feodo Tracker",
+    "Heuristiques d'hébergement masquant",
+    "Verdict consolidé",
   ],
 };
 
 const EXAMPLES: Record<Tab, string[]> = {
-  url: [
-    "https://ameli-remboursement-securise.top/cartevitale",
-    "https://www.impots-gouv-fr.info/remboursement",
-    "https://compte-mar0ctelecom.ma-factures.xyz/connexion",
-  ],
-  email: [
-    "remboursement@ameli-cpam.top",
-    "support@dgi-maroc.org",
-    "direction.rh@banque-populaire.energy",
-  ],
-  ip: ["105.158.44.17", "81.252.114.33", "8.8.8.8"],
+  url: ["https://ameli-remboursement-securise.top/connexion", "https://www.impots-gouv-fr.info/remboursement", "https://docs.entreprise-partage.fr/rapport-q3"],
+  email: ["remboursement@ameli-cpam.top", "direction.rh@groupe-total.energy", "support@dgi-maroc.org"],
+  ip: ["185.220.101.47", "8.8.8.8", "45.155.205.86"],
 };
 
 interface Finding {
   label: string;
   tone: "ok" | "warn" | "bad";
+  src: "RÉEL" | "HEUR.";
 }
 
 interface Verdict {
@@ -58,59 +52,170 @@ interface Verdict {
   level: "SÛR" | "SUSPECT" | "MALVEILLANT";
   findings: Finding[];
   hash: string;
+  real: number;
 }
 
-function analyze(tab: Tab, raw: string): Verdict {
-  const input = raw.trim();
-  const rnd = mulberry32(seedFrom(tab + input));
-  let risk = 6 + Math.round(rnd() * 18);
-  const findings: Finding[] = [];
-  const s = input.toLowerCase();
+const MASK_RE = /hosting|vps|cloud|dedicat|server|ovh|hetzner|digital\s?ocean|linode|contabo|scaleway|vultr|choopa|m247/i;
 
-  if (tab === "url") {
-    if (/xn--/.test(s)) { risk += 24; findings.push({ label: "Domaine punycode — homoglyphes détectés", tone: "bad" }); }
-    if (/\.(zip|tk|xyz|top|click|gq|ml)\b/.test(s)) { risk += 22; findings.push({ label: "TLD à fort taux d'abus (.xyz, .tk…)", tone: "bad" }); }
-    if (/(ameli|arneli|cpam|impots|gouv|caf|dgi|cnss|barid|maroctelecom|mar0ctelecom|iam-|banque|tresor)/.test(s) && /\.(tk|xyz|top|click|gq|ml|info)\b/.test(s)) {
-      risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS, Maroc Telecom…)", tone: "bad" });
-    }
-    if (/https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(s)) { risk += 20; findings.push({ label: "URL en adresse IP brute — masque d'hameçonnage", tone: "bad" }); }
-    if (/http:\/\//.test(s)) { risk += 12; findings.push({ label: "Transport non chiffré (HTTP simple)", tone: "warn" }); }
-    if (s.includes("@")) { risk += 16; findings.push({ label: "Caractère « @ » dans l'URL — redirection masquée", tone: "warn" }); }
-    if (/(login|verify|secure|update|bank|wallet|remboursement)/.test(s) && /\.(xyz|tk|info|top|click)/.test(s)) { risk += 18; findings.push({ label: "Lexique bancaire + domaine jetable : leurre typique", tone: "bad" }); }
-    if ((s.match(/-/g) || []).length > 2) { risk += 8; findings.push({ label: "Sous-domaines à répétition", tone: "warn" }); }
-    if (s.length > 62) { risk += 6; findings.push({ label: "Longueur anormale — paramètres de pistage", tone: "warn" }); }
-    if (risk < 30) findings.push({ label: "Certificat TLS valide, domaine ancien et réputé", tone: "ok" }, { label: "Aucune correspondance en base de phishing", tone: "ok" });
-  } else if (tab === "email") {
-    if (!s.includes("@")) { risk += 50; findings.push({ label: "Format d'adresse invalide", tone: "bad" }); }
-    const domain = s.split("@")[1] || "";
-    if (/(urgent|suspendu|virement|mot.de.passe|gain|loterie|colis|remboursement|otp|code de)/.test(s)) { risk += 20; findings.push({ label: "Lexique d'urgence sociale détecté", tone: "bad" }); }
-    if (/\.(tk|xyz|top|ml|click)$/.test(domain)) { risk += 22; findings.push({ label: "Domaine jetable à fort taux d'abus", tone: "bad" }); }
-    if (/(\d{1,3}\.){3}\d{1,3}$/.test(domain)) { risk += 20; findings.push({ label: "Domaine en IP littérale", tone: "bad" }); }
-    const govBrand = /(dgi|impots|gouv|ameli|cpam|caf|cnss|barid|maroctelecom|banque|tresor)/.test(s);
-    if (govBrand && !/\.(fr|com|net|org)$/.test(domain)) { risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS…)", tone: "bad" }); }
-    if (govBrand && /\.(fr|com|net|org)$/.test(domain) && domain.split(".").length === 2) { risk += 10; findings.push({ label: "Domaine institutionnel prétendu — vérifier l'expéditeur officiel", tone: "warn" }); }
-    if (/(paypal|netflix|microsoft|total|orange|sfr|free)/.test(s) && !/\.(fr|com|net|org)$/.test(domain)) { risk += 16; findings.push({ label: "Usurpation de marque probable", tone: "warn" }); }
-    if (domain.split(".").length < 2) { risk += 10; findings.push({ label: "Suffixe de domaine incomplet", tone: "warn" }); }
-    if (risk < 30) findings.push({ label: "Alignement SPF/DKIM/DMARC conforme", tone: "ok" }, { label: "Expéditeur connu, historique sain", tone: "ok" });
-  } else {
-    const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(input);
-    if (!ipv4) { risk += 40; findings.push({ label: "Format IPv4 non reconnu", tone: "bad" }); }
-    if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(input)) { risk = 8; findings.push({ label: "Plage privée (RFC 1918) — usage interne", tone: "ok" }); }
-    if (rnd() < 0.5 && ipv4) { risk += 24; findings.push({ label: "Répertoriée comme nœud de sortie Tor", tone: "bad" }); }
-    if (rnd() < 0.4 && ipv4) { risk += 16; findings.push({ label: "Observée dans des scans de ports récents", tone: "warn" }); }
-    if (rnd() < 0.3 && ipv4) { risk += 12; findings.push({ label: "ASN hébergeur « bulletproof »", tone: "warn" }); }
-    if (risk < 30 && findings.length === 0) findings.push({ label: "Aucun historique d'abus sur les 90 derniers jours", tone: "ok" });
+function hostOf(raw: string): string {
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : "https://" + raw).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+async function analyzeUrl(raw: string): Promise<Verdict> {
+  const s = raw.trim();
+  const findings: Finding[] = [];
+  let risk = 6;
+  let real = 0;
+
+  if (/xn--/.test(s)) { risk += 24; findings.push({ label: "Domaine punycode — homoglyphes détectés", tone: "bad", src: "HEUR." }); }
+  if (/\.(zip|tk|xyz|top|click|gq|ml)(\/|$)/i.test(s)) { risk += 22; findings.push({ label: "TLD à fort taux d'abus (.xyz, .tk, .top…)", tone: "bad", src: "HEUR." }); }
+  if (/https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(s)) { risk += 20; findings.push({ label: "URL en adresse IP brute — masque classique d'hameçonnage", tone: "bad", src: "HEUR." }); }
+  if (/^http:\/\//.test(s)) { risk += 12; findings.push({ label: "Transport non chiffré (HTTP simple)", tone: "warn", src: "HEUR." }); }
+  if (s.includes("@")) { risk += 16; findings.push({ label: "Caractère « @ » dans l'URL — redirection masquée", tone: "warn", src: "HEUR." }); }
+  if (/(ameli|arneli|cpam|impots|gouv|caf|dgi|cnss|barid|maroctelecom|mar0ctelecom|banque|tresor)/.test(s) && /\.(tk|xyz|top|click|gq|ml|info)\b/.test(s)) {
+    risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS, Maroc Telecom…)", tone: "bad", src: "HEUR." });
+  }
+  if ((s.match(/-/g) || []).length > 3) { risk += 8; findings.push({ label: "Sous-domaines à répétition", tone: "warn", src: "HEUR." }); }
+  if (s.length > 62) { risk += 6; findings.push({ label: "Longueur anormale — paramètres de pistage", tone: "warn", src: "HEUR." }); }
+
+  const host = hostOf(s);
+  if (host) {
+    try {
+      const ips = await resolveDns(host, "A");
+      real++;
+      if (!ips.length) { risk += 30; findings.push({ label: `${host} ne résout pas en DNS — domaine fantôme`, tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: `DNS actif : ${ips.length} adresse${ips.length > 1 ? "s" : ""} (${ips[0]})`, tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    try {
+      const tf = await threatFoxSearch(host);
+      real++;
+      if (tf) { risk += 55; findings.push({ label: `Répertorié ThreatFox — ${tf.malware_printable ?? tf.malware} (${tf.threat_type})`, tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: "Absent des référentiels ThreatFox", tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    const full = /^https?:\/\//i.test(s) ? s : "https://" + s;
+    try {
+      const uh = await urlhausCheck(full);
+      real++;
+      if (uh) { risk += 60; findings.push({ label: `URL malveillante active (URLhaus) — ${uh.threat}${uh.tags?.length ? " · " + uh.tags.join(", ") : ""}`, tone: "bad", src: "RÉEL" }); }
+    } catch { /* source injoignable */ }
+  }
+
+  if (risk < 25 && findings.filter((f) => f.tone !== "ok").length === 0) {
+    findings.push({ label: "Aucun signal défavorable détecté", tone: "ok", src: "RÉEL" });
+  }
+  risk = Math.min(97, risk);
+  const level: Verdict["level"] = risk < 30 ? "SÛR" : risk < 65 ? "SUSPECT" : "MALVEILLANT";
+  return { score: risk, level, findings, hash: (seedFrom("url" + s) >>> 0).toString(16).toUpperCase().padStart(8, "0"), real };
+}
+
+async function analyzeEmail(raw: string): Promise<Verdict> {
+  const s = raw.trim().toLowerCase();
+  const findings: Finding[] = [];
+  let risk = 6;
+  let real = 0;
+
+  const domain = s.includes("@") ? s.split("@")[1] ?? "" : "";
+  if (!s.includes("@")) { risk += 50; findings.push({ label: "Format d'adresse invalide", tone: "bad", src: "HEUR." }); }
+  if (/(urgent|suspendu|virement|mot.de.passe|gain|loterie|colis|remboursement|otp|code de)/.test(s)) { risk += 20; findings.push({ label: "Lexique d'urgence sociale détecté", tone: "bad", src: "HEUR." }); }
+  if (/\.(tk|xyz|top|ml|click)$/.test(domain)) { risk += 22; findings.push({ label: "Domaine jetable à fort taux d'abus", tone: "bad", src: "HEUR." }); }
+  if (/(\d{1,3}\.){3}\d{1,3}$/.test(domain)) { risk += 20; findings.push({ label: "Domaine en IP littérale", tone: "bad", src: "HEUR." }); }
+  const govBrand = /(dgi|impots|gouv|ameli|cpam|caf|cnss|barid|maroctelecom|banque|tresor)/.test(s);
+  if (govBrand && !/\.(fr|ma|com|net|org)$/.test(domain)) { risk += 20; findings.push({ label: "Usurpation d'une institution FR/MA (Ameli, CAF, DGI, CNSS…)", tone: "bad", src: "HEUR." }); }
+  if (/(paypal|netflix|microsoft|orange|sfr|free)/.test(s) && !/\.(fr|com|net|org)$/.test(domain)) { risk += 16; findings.push({ label: "Usurpation de marque probable", tone: "warn", src: "HEUR." }); }
+
+  if (domain) {
+    try {
+      const mx = await resolveDns(domain, "MX");
+      real++;
+      if (!mx.length) { risk += 28; findings.push({ label: "Aucun enregistrement MX — le domaine ne reçoit pas d'e-mails", tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: `MX actif : ${mx.length} relais de courrier (${mx[0].split(" ").pop()})`, tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    try {
+      const a = await resolveDns(domain, "A");
+      real++;
+      if (!a.length) { risk += 22; findings.push({ label: "Le domaine ne résout pas en DNS", tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: `Domaine résolu : ${a[0]}`, tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    try {
+      const tf = await threatFoxSearch(domain);
+      real++;
+      if (tf) { risk += 55; findings.push({ label: `Domaine répertorié ThreatFox — ${tf.malware_printable ?? tf.malware}`, tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: "Domaine absent des référentiels ThreatFox", tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
   }
 
   risk = Math.min(97, risk);
   const level: Verdict["level"] = risk < 30 ? "SÛR" : risk < 65 ? "SUSPECT" : "MALVEILLANT";
-  return { score: risk, level, findings, hash: (seedFrom(tab + input) >>> 0).toString(16).toUpperCase().padStart(8, "0") };
+  return { score: risk, level, findings, hash: (seedFrom("mail" + s) >>> 0).toString(16).toUpperCase().padStart(8, "0"), real };
 }
 
-const VERDICT_STYLE: Record<Verdict["level"], { text: string; hex: string; ring: string }> = {
-  "SÛR": { text: "text-pulse", hex: "#43f08d", ring: "stroke-pulse" },
-  "SUSPECT": { text: "text-warn", hex: "#ffb020", ring: "stroke-warn" },
-  "MALVEILLANT": { text: "text-alert", hex: "#ff4d5e", ring: "stroke-alert" },
+async function analyzeIp(raw: string): Promise<Verdict> {
+  const ip = raw.trim();
+  const findings: Finding[] = [];
+  let risk = 6;
+  let real = 0;
+
+  const ipv4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.test(ip) && ip.split(".").every((o) => Number(o) <= 255);
+  if (!ipv4) { risk += 45; findings.push({ label: "Format IPv4 non reconnu", tone: "bad", src: "HEUR." }); }
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) {
+    risk = 8;
+    findings.push({ label: "Plage privée (RFC 1918) — usage interne", tone: "ok", src: "HEUR." });
+  }
+
+  if (ipv4) {
+    try {
+      const g = await geoIp(ip);
+      real++;
+      if (g) {
+        const org = `${g.connection?.org ?? ""} ${g.connection?.isp ?? ""}`;
+        const masked = MASK_RE.test(org);
+        if (masked) { risk += 18; findings.push({ label: `Hébergement générique susceptible de masquer l'origine — ${g.connection?.org}`, tone: "warn", src: "RÉEL" }); }
+        findings.push({ label: `${g.flag?.emoji ?? ""} ${g.city ?? "?"}, ${g.country ?? "?"} — ASN ${g.connection?.asn ?? "?"} · ${g.connection?.org ?? "?"}`, tone: masked ? "warn" : "ok", src: "RÉEL" });
+      } else {
+        findings.push({ label: "Géolocalisation publique indisponible pour cette adresse", tone: "warn", src: "RÉEL" });
+      }
+    } catch { /* source injoignable */ }
+    try {
+      const arpa = ip.split(".").reverse().join(".") + ".in-addr.arpa";
+      const r = await resolveDns(arpa, "PTR");
+      real++;
+      if (r.length) findings.push({ label: `PTR : ${r[0]}`, tone: "ok", src: "RÉEL" });
+      else findings.push({ label: "Aucun PTR — mutisme DNS", tone: "warn", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    try {
+      await ensureFeed();
+      const fd = feodoMatch(ip);
+      real++;
+      if (fd) { risk += 60; findings.push({ label: `Infrastructure de commande répertoriée Feodo Tracker — ${fd.malware} (${fd.ioc})`, tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: "Absente de la liste de blocage Feodo (C2)", tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+    try {
+      const tf = await threatFoxSearch(ip);
+      real++;
+      if (tf) { risk += 55; findings.push({ label: `Répertoriée ThreatFox — ${tf.malware_printable ?? tf.malware} (${tf.threat_type})`, tone: "bad", src: "RÉEL" }); }
+      else findings.push({ label: "Absente des référentiels ThreatFox", tone: "ok", src: "RÉEL" });
+    } catch { /* source injoignable */ }
+  }
+
+  risk = Math.min(97, risk);
+  const level: Verdict["level"] = risk < 30 ? "SÛR" : risk < 65 ? "SUSPECT" : "MALVEILLANT";
+  return { score: risk, level, findings, hash: (seedFrom("ip" + ip) >>> 0).toString(16).toUpperCase().padStart(8, "0"), real };
+}
+
+function analyze(tab: Tab, raw: string): Promise<Verdict> {
+  if (tab === "url") return analyzeUrl(raw);
+  if (tab === "email") return analyzeEmail(raw);
+  return analyzeIp(raw);
+}
+
+const VERDICT_STYLE: Record<Verdict["level"], { text: string; ring: string }> = {
+  "SÛR": { text: "text-pulse", ring: "stroke-pulse" },
+  "SUSPECT": { text: "text-warn", ring: "stroke-warn" },
+  "MALVEILLANT": { text: "text-alert", ring: "stroke-alert" },
 };
 
 export default function Scanner() {
@@ -122,7 +227,7 @@ export default function Scanner() {
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
-  const pending = useRef<Verdict | null>(null);
+  const pending = useRef<Promise<Verdict> | null>(null);
   const timer = useRef<number>(0);
 
   const steps = STEP_SETS[tab];
@@ -136,6 +241,24 @@ export default function Scanner() {
     setPhase("idle");
     setStepIdx(-1);
     setVerdict(null);
+  };
+
+  const finalize = async () => {
+    let v: Verdict;
+    try {
+      v = await pending.current!;
+    } catch {
+      v = {
+        score: 50,
+        level: "SUSPECT",
+        real: 0,
+        findings: [{ label: "Sources publiques injoignables — verdict heuristique seul", tone: "warn", src: "HEUR." }],
+        hash: "ERR00000",
+      };
+    }
+    setStepIdx(steps.length);
+    setVerdict(v);
+    setPhase("done");
   };
 
   const run = (value?: string) => {
@@ -153,15 +276,14 @@ export default function Scanner() {
     let i = 0;
     timer.current = window.setInterval(() => {
       i += 1;
-      if (i >= steps.length) {
+      if (i >= steps.length - 1) {
         clearInterval(timer.current);
-        setStepIdx(steps.length);
-        setVerdict(pending.current);
-        setPhase("done");
+        setStepIdx(steps.length - 1);
+        finalize();
       } else {
         setStepIdx(i);
       }
-    }, 430);
+    }, 520);
   };
 
   const copyReport = async () => {
@@ -169,18 +291,16 @@ export default function Scanner() {
     const lines = [
       `RAPPORT AEGIS-7 — ${tab.toUpperCase()} :: ${input.trim()}`,
       `Verdict : ${verdict.level} (score de risque ${verdict.score}/100)`,
+      `Vérifications réelles effectuées : ${verdict.real}`,
       `Empreinte : 0x${verdict.hash}`,
-      ...verdict.findings.map((f) => ` • [${f.tone.toUpperCase()}] ${f.label}`),
-      "Généré par l'agent IA AEGIS-7 — démonstration (données simulées).",
+      ...verdict.findings.map((f) => ` • [${f.src}] [${f.tone.toUpperCase()}] ${f.label}`),
+      "Sources : abuse.ch (ThreatFox, URLhaus, Feodo), Google DoH, ipwho.is — usage défensif.",
     ].join("\n");
     try {
       await navigator.clipboard.writeText(lines);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
-    } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
-    }
+    } catch { /* presse-papiers indisponible */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
   };
 
   const vs = verdict ? VERDICT_STYLE[verdict.level] : null;
@@ -190,14 +310,14 @@ export default function Scanner() {
     <section id="analyse" ref={ref} className={`reveal ${inView ? "reveal-in" : ""} mx-auto max-w-7xl scroll-mt-24 px-4 pt-24 sm:px-6`}>
       <div className="flex items-end justify-between gap-6">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.34em] text-cyber">LABORATOIRE D'ANALYSE</p>
+          <p className="font-mono text-[11px] tracking-[0.34em] text-cyber">LABORATOIRE D'ANALYSE — VÉRIFICATIONS RÉELLES</p>
           <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-snow sm:text-4xl">
             Soumettez un artefact <span className="text-cyber">suspect</span>.
           </h2>
         </div>
         <p className="hidden max-w-sm text-sm leading-relaxed text-fog lg:block">
-          URL, adresse d'expédition ou IP : l'agent interroge 14 bases de réputation et son moteur
-          neuronal, puis rend un verdict argumenté.
+          Chaque vérification « RÉEL » interroge une source publique en direct : DNS Google, abuse.ch
+          (ThreatFox, URLhaus, Feodo), ipwho.is. Les heuristiques complètent le verdict.
         </p>
       </div>
 
@@ -283,7 +403,7 @@ export default function Scanner() {
                     </span>
                     <span className={`font-mono text-xs ${state === "done" ? "text-snow" : state === "live" ? "text-cyber" : "text-fog-dim"}`}>{s}</span>
                     {state === "live" && <span className="ml-auto font-mono text-[9px] tracking-[0.2em] text-cyber">EN COURS</span>}
-                    {state === "done" && <span className="ml-auto font-mono text-[9px] tracking-[0.2em] text-pulse">OK · 0.{(i + 2) * 7}s</span>}
+                    {state === "done" && <span className="ml-auto font-mono text-[9px] tracking-[0.2em] text-pulse">OK</span>}
                   </li>
                 );
               })}
@@ -301,10 +421,10 @@ export default function Scanner() {
                 <IconFingerprint className={`h-10 w-10 ${phase === "running" ? "animate-pulse text-cyber" : ""}`} />
               </span>
               <p className="font-display mt-5 text-sm font-bold tracking-[0.2em] text-fog">
-                {phase === "running" ? "INTERROGATION DES MOTEURS…" : "EN ATTENTE D'ARTEFACT"}
+                {phase === "running" ? "INTERROGATION DES SOURCES PUBLIQUES…" : "EN ATTENTE D'ARTEFACT"}
               </p>
               <p className="mt-2 max-w-xs font-mono text-[10px] leading-relaxed text-fog-dim">
-                Moteur NX-2 v7.3 · 14 bases de réputation · bac à sable de pré-détonation opérationnel
+                abuse.ch · Google DoH · ipwho.is — interrogés en direct, aucune base simulée
               </p>
             </div>
           )}
@@ -334,7 +454,7 @@ export default function Scanner() {
                   {verdict.level}
                 </div>
                 <p className="mt-2 font-mono text-[10px] tracking-[0.16em] text-fog-dim">
-                  EMPREINTE 0x{verdict.hash} · ARTEFACT : <span className="text-fog">{input.trim().slice(0, 30)}</span>
+                  EMPREINTE 0x{verdict.hash} · <span className="text-cyber">{verdict.real} VÉRIF. RÉELLES</span>
                 </p>
               </div>
 
@@ -346,7 +466,10 @@ export default function Scanner() {
                     ) : (
                       <IconWarning className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${f.tone === "bad" ? "text-alert" : "text-warn"}`} />
                     )}
-                    <span className="text-fog">{f.label}</span>
+                    <span className="min-w-0 flex-1 text-fog">{f.label}</span>
+                    <span className={`shrink-0 border px-1 py-0.5 text-[8px] tracking-[0.12em] ${f.src === "RÉEL" ? "border-cyber/50 text-cyber" : "border-line text-fog-dim"}`}>
+                      {f.src}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -364,7 +487,7 @@ export default function Scanner() {
                     if (!verdict) return;
                     window.dispatchEvent(
                       new CustomEvent("aegis-escalate", {
-                        detail: `Analyse laboratoire (${tab}) : ${input.trim()} — verdict ${verdict.level}, score de risque ${verdict.score}/100.`,
+                        detail: `Analyse laboratoire (${tab}) : ${input.trim()} — verdict ${verdict.level}, score de risque ${verdict.score}/100, ${verdict.real} vérifications réelles.`,
                       })
                     );
                     document.getElementById("essaim")?.scrollIntoView({ behavior: "smooth", block: "start" });

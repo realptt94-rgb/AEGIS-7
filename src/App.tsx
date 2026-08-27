@@ -1,8 +1,9 @@
-import CommandCenter from "./components/CommandCenter";
+import Attribution from "./components/Attribution";
+import LiveOps from "./components/LiveOps";
 import Scanner from "./components/Scanner";
 import Swarm from "./components/Swarm";
 import { Footer, Ticker, TopBar } from "./components/Chrome";
-import { Intel, Modules, Playbook, StatsBand } from "./components/Sections";
+import { Intel, Modules, Playbook } from "./components/Sections";
 import { useInView } from "./hooks";
 import { IconShieldCore } from "./components/Icons";
 
@@ -55,7 +56,7 @@ function ClosingBanner() {
               ANALYSER UN ARTEFACT
             </a>
             <a
-              href="#console"
+              href="#flux"
               className="border border-line px-8 py-3.5 font-display text-xs font-bold tracking-[0.22em] text-fog transition-all duration-300 hover:border-cyber/70 hover:text-cyber"
             >
               VOIR LA CONSOLE
@@ -75,9 +76,9 @@ export default function App() {
       <main className="relative">
         <div className="h-16" />
         <Ticker />
-        <CommandCenter />
-        <StatsBand />
+        <LiveOps />
         <Scanner />
+        <Attribution />
         <Swarm />
         <Modules />
         <Intel />

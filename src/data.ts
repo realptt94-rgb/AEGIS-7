@@ -300,3 +300,18 @@ export const SWARM_EXAMPLES = [
   "L'IP 105.158.44.17 scanne notre serveur de Casablanca toutes les 4 secondes depuis 2 h",
   "Notre boutique en ligne (Paris) redirige parfois les clients vers une page en .xyz",
 ];
+
+/* ------------------------------------------------------------------ */
+/* Mode réel — sources publiques de renseignement                      */
+/* ------------------------------------------------------------------ */
+
+export const BRAVE_API_KEY = "BSAq1DN5k0fnKRNudkcPittnCR0SuMV";
+
+export type LiveSourceId = "THREATFOX" | "FEODO" | "URLHAUS" | "MALWAREBAZAAR";
+
+export const LIVE_SOURCES: Record<LiveSourceId, { name: string; org: string }> = {
+  THREATFOX: { name: "ThreatFox", org: "abuse.ch — IOC mondiaux" },
+  FEODO: { name: "Feodo Tracker", org: "abuse.ch — C2 botnets" },
+  URLHAUS: { name: "URLhaus", org: "abuse.ch — URLs malveillantes" },
+  MALWAREBAZAAR: { name: "MalwareBazaar", org: "abuse.ch — échantillons" },
+};

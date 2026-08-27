@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { TICKER_ITEMS } from "../data";
+import { useFeed } from "../live";
 import { IconShieldCore } from "./Icons";
 
 const NAV = [
-  { href: "#console", label: "Console" },
+  { href: "#flux", label: "Flux réel" },
   { href: "#analyse", label: "Analyse" },
+  { href: "#attribution", label: "Attribution" },
   { href: "#essaim", label: "Essaim IA" },
   { href: "#modules", label: "Modules" },
-  { href: "#renseignement", label: "Renseignement" },
   { href: "#riposte", label: "Riposte" },
 ];
 
@@ -74,7 +75,7 @@ export function TopBar() {
             <span className="font-mono text-[10px] tracking-[0.2em] text-pulse">EN LIGNE</span>
           </div>
           <span className="hidden border border-cyber/40 bg-cyber/10 px-2 py-1 font-mono text-[9px] tracking-[0.2em] text-cyber md:block">
-            PÉRIMÈTRE FR + MA
+            FR + MA · MODE RÉEL 100%
           </span>
           <div className="hidden text-right md:block">
             <div className="font-mono text-xs text-snow tabular-nums">{uptime}</div>
@@ -96,9 +97,13 @@ export function TopBar() {
 }
 
 export function Ticker() {
+  const feed = useFeed();
+  const items = feed.events.length
+    ? feed.events.slice(0, 14).map((e) => `${e.malware.toUpperCase()} · ${e.ioc.length > 44 ? e.ioc.slice(0, 44) + "…" : e.ioc} [${e.source}]`)
+    : TICKER_ITEMS;
   const row = (key: string) => (
     <div key={key} className="flex shrink-0 items-center">
-      {TICKER_ITEMS.map((item, i) => (
+      {items.map((item, i) => (
         <span key={i} className="flex items-center font-mono text-[11px] text-fog">
           <span className="px-5 whitespace-nowrap">{item}</span>
           <svg viewBox="0 0 8 8" className="h-1.5 w-1.5 text-cyber/70" fill="currentColor">

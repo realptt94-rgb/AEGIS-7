@@ -244,10 +244,10 @@ export function Playbook() {
   const [sent, setSent] = useState(false);
 
   const simulate = () => {
-    window.dispatchEvent(new CustomEvent("aegis-burst"));
+    window.dispatchEvent(new CustomEvent("aegis-refresh"));
     setSent(true);
     setTimeout(() => setSent(false), 2400);
-    document.getElementById("console")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("flux")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -273,10 +273,10 @@ export function Playbook() {
             }`}
           >
             {sent ? <IconCheck className="h-4 w-4" /> : <IconBolt className="h-4 w-4 transition-transform group-hover:scale-125" />}
-            {sent ? "RIPOSTE TRANSMISE — VOIR LA CONSOLE" : "SIMULER UNE RIPOSTE"}
+            {sent ? "ACTUALISATION TRANSMISE" : "ACTUALISER LE FLUX RÉEL"}
           </button>
           <p className="mt-3 font-mono text-[10px] tracking-[0.14em] text-fog-dim">
-            ▸ L'événement s'injecte dans le journal de défense ci-dessus.
+            ▸ Les quatre référentiels publics sont réinterrogés immédiatement.
           </p>
         </div>
 
