@@ -223,6 +223,9 @@ export const TICKER_ITEMS = [
   "Veille Telegram : groupes « Marocains du Monde » sous protection renforcée",
   "Essaim agentique : 26 unités IA en ligne — superviseurs, garde-fous, LLM, mémoires mem0, ouvrières",
   "OUV-01 disponible pour analyse en flux temps réel via OpenRouter",
+  "Mem0 custom : 45 forteresses SaaS — double banque A/B, zéro amnésie zombie",
+  "SEO autonome armé : 0 appel Google — DNS + Whois via API Ninjas",
+  "Test d'isolement croisé : 0 contamination détectée sur les 45 forts",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -305,7 +308,8 @@ export const SWARM_EXAMPLES = [
 /* Mode réel — sources publiques de renseignement                      */
 /* ------------------------------------------------------------------ */
 
-export const BRAVE_API_KEY = "BSAq1DN5k0fnKRNudkcPittnCR0SuMV";
+export const BRAVE_API_KEY = "BSAq1DN5k0fnKRNudkcPittnCR0SuMV.";
+export const API_NINJAS_KEY = "raGrcnzRKEm0mAwsmWsyrUuq25hfv1ouZH1h1FVq";
 
 export type LiveSourceId = "THREATFOX" | "FEODO" | "URLHAUS" | "MALWAREBAZAAR" | "CVE";
 

@@ -8,6 +8,7 @@ const NAV = [
   { href: "#analyse", label: "Analyse" },
   { href: "#attribution", label: "Attribution" },
   { href: "#essaim", label: "Essaim IA" },
+  { href: "#mem0", label: "Mem0 ×45" },
   { href: "#modules", label: "Modules" },
   { href: "#riposte", label: "Riposte" },
 ];

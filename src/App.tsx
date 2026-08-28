@@ -1,5 +1,6 @@
 import Attribution from "./components/Attribution";
 import LiveOps from "./components/LiveOps";
+import MemZero from "./components/MemZero";
 import Scanner from "./components/Scanner";
 import Swarm from "./components/Swarm";
 import { Footer, Ticker, TopBar } from "./components/Chrome";
@@ -80,6 +81,7 @@ export default function App() {
         <Scanner />
         <Attribution />
         <Swarm />
+        <MemZero />
         <Modules />
         <Intel />
         <Playbook />

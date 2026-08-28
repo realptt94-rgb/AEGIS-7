@@ -6,7 +6,7 @@
 /* ================================================================ */
 
 import { useEffect, useReducer } from "react";
-import { BRAVE_API_KEY, type LiveSourceId } from "./data";
+import { API_NINJAS_KEY, BRAVE_API_KEY, type LiveSourceId } from "./data";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
@@ -413,4 +413,25 @@ export async function braveSearch(
     url: String(x.url ?? ""),
     desc: String(x.description ?? ""),
   }));
+}
+
+/* ------------------------------------------------------------------ */
+/* SEO autonome — API Ninjas (zéro Google)                             */
+/* ------------------------------------------------------------------ */
+
+export async function ninjasDns(domain: string): Promise<any[]> {
+  const r = await rawFetch(`https://api.api-ninjas.com/v1/dnslookup?domain=${encodeURIComponent(domain)}`, {
+    headers: { "X-Api-Key": API_NINJAS_KEY },
+  }, 12000);
+  if (!r.ok) throw new Error(`API Ninjas HTTP ${r.status}`);
+  const j = await r.json();
+  return Array.isArray(j) ? j : [];
+}
+
+export async function ninjasWhois(domain: string): Promise<any> {
+  const r = await rawFetch(`https://api.api-ninjas.com/v1/whois?domain=${encodeURIComponent(domain)}`, {
+    headers: { "X-Api-Key": API_NINJAS_KEY },
+  }, 12000);
+  if (!r.ok) throw new Error(`API Ninjas HTTP ${r.status}`);
+  return r.json();
 }
