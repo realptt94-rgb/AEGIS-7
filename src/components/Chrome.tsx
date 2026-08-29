@@ -7,6 +7,7 @@ const NAV = [
   { href: "#flux", label: "Flux réel" },
   { href: "#analyse", label: "Analyse" },
   { href: "#attribution", label: "Attribution" },
+  { href: "#bouclier", label: "Bouclier" },
   { href: "#essaim", label: "Essaim IA" },
   { href: "#mem0", label: "Mem0 ×45" },
   { href: "#modules", label: "Modules" },
@@ -57,7 +58,7 @@ export function TopBar() {
           </span>
         </a>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="no-scrollbar hidden max-w-[44vw] items-center gap-1 overflow-x-auto lg:flex">
           {NAV.map((n) => (
             <a
               key={n.href}

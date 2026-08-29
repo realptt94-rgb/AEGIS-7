@@ -226,6 +226,8 @@ export const TICKER_ITEMS = [
   "Mem0 custom : 45 forteresses SaaS — double banque A/B, zéro amnésie zombie",
   "SEO autonome armé : 0 appel Google — DNS + Whois via API Ninjas",
   "Test d'isolement croisé : 0 contamination détectée sur les 45 forts",
+  "Pare-feu cognitif armé : clés API, IP, ports, DNS et logs masqués avant toute sortie",
+  "Règle active : 11 catégories de marqueurs neutralisées en un seul passage",
 ];
 
 /* ------------------------------------------------------------------ */

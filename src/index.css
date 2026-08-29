@@ -125,6 +125,22 @@ body {
 }
 .animate-scan-beam { animation: scanBeam 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
+/* Panneau « champ stérile » du pare-feu cognitif */
+.scanfield::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10%;
+  height: 12%;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgba(255, 176, 32, 0.07), transparent);
+  animation: scanBeam 5s linear infinite;
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 @keyframes flickerIn {
   0% { opacity: 0; }
   8% { opacity: 0.8; }

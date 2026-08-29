@@ -81,6 +81,14 @@ const setState = (p: Partial<FeedState>) => {
 export const getFeed = () => state;
 export const setPaused = (v: boolean) => setState({ paused: v });
 
+/* Pare-feu cognitif — mode masquage global (IP, ports, DNS, hachages) */
+let maskMode = false;
+export const getMaskMode = () => maskMode;
+export function setMaskMode(v: boolean) {
+  maskMode = v;
+  emit();
+}
+
 export function hashStr(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {

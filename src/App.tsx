@@ -1,4 +1,5 @@
 import Attribution from "./components/Attribution";
+import CognitiveFirewall from "./components/CognitiveFirewall";
 import LiveOps from "./components/LiveOps";
 import MemZero from "./components/MemZero";
 import Scanner from "./components/Scanner";
@@ -80,6 +81,7 @@ export default function App() {
         <LiveOps />
         <Scanner />
         <Attribution />
+        <CognitiveFirewall />
         <Swarm />
         <MemZero />
         <Modules />

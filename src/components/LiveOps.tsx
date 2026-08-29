@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { LIVE_SOURCES, type LiveSourceId } from "../data";
-import { refreshFeed, setPaused, timeAgo, useFeed, type LiveEvent } from "../live";
+import { getMaskMode, refreshFeed, setMaskMode, setPaused, timeAgo, useFeed, type LiveEvent } from "../live";
+import { maskIoc } from "../sanitize";
 import { useInView } from "../hooks";
-import { IconCrosshair, IconExternal, IconPause, IconPlay, IconRadar, IconWarning } from "./Icons";
+import { IconCrosshair, IconExternal, IconLock, IconPause, IconPlay, IconRadar, IconWarning } from "./Icons";
 
 const SEV_COLOR = ["text-pulse", "text-warn", "text-alert"];
 const SEV_LABEL = ["FAIBLE", "MOYEN", "CRITIQUE"];
@@ -125,6 +126,18 @@ export default function LiveOps() {
             {feed.paused ? <IconPlay className="h-4 w-4" /> : <IconPause className="h-4 w-4" />}
           </button>
           <button
+            onClick={() => setMaskMode(!getMaskMode())}
+            className={`flex h-10 items-center gap-2 border px-3.5 font-display text-[10px] font-bold tracking-[0.16em] transition-all ${
+              getMaskMode()
+                ? "border-warn/70 bg-warn/15 text-warn shadow-[0_0_16px_rgba(255,176,32,0.2)]"
+                : "border-line text-fog hover:border-warn/60 hover:text-warn"
+            }`}
+            title="Pare-feu cognitif — masquer IP, ports et DNS du flux"
+          >
+            <IconLock className="h-3.5 w-3.5" />
+            {getMaskMode() ? "MASQUÉ" : "MASQUER"}
+          </button>
+          <button
             onClick={() => { setPaused(false); refreshFeed(); }}
             className="clip-tag flex h-10 items-center gap-2 bg-cyber px-4 font-display text-[10px] font-bold tracking-[0.18em] text-ink-950 transition-all hover:bg-snow"
           >
@@ -186,7 +199,7 @@ export default function LiveOps() {
           <div className="flex flex-1 flex-wrap items-center gap-x-6 gap-y-1 font-mono text-[11px]">
             <span className="text-snow">
               <span className="text-fog-dim">IP publique : </span>
-              <span className="text-cyber">{feed.exposure.ip}</span>
+              <span className="text-cyber">{getMaskMode() ? maskIoc(feed.exposure.ip) : feed.exposure.ip}</span>
             </span>
             <span className="text-fog">
               {feed.exposure.flag ?? ""} {feed.exposure.city ?? "?"}, {feed.exposure.country ?? "?"}
@@ -274,8 +287,8 @@ export default function LiveOps() {
                         <span className={`w-24 shrink-0 truncate border px-1.5 py-0.5 text-center font-mono text-[8px] tracking-[0.1em] ${SOURCE_CHIP[e.source]}`}>
                           {e.source}
                         </span>
-                        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-snow" title={e.ioc}>
-                          {e.ioc}
+                        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-snow" title={getMaskMode() ? "masqué par le pare-feu cognitif" : e.ioc}>
+                          {getMaskMode() ? maskIoc(e.ioc) : e.ioc}
                         </span>
                         <span className="hidden w-28 shrink-0 truncate font-mono text-[10px] text-fog sm:block" title={e.malware}>
                           {e.malware}
